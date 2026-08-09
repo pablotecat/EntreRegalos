@@ -1,1064 +1,1064 @@
-# Ejecutar desde: EntreRegalos/backend/
+# Ejecutar desde: EntreRegalos/frontend/
 
-# ── Crear estructura de carpetas ─────────────────────────────────
-mkdir -p src/auth/{dto,strategies,guards}
-mkdir -p src/users
-mkdir -p src/common/decorators
-mkdir -p src/invitations/dto
+# ── Estructura de carpetas ────────────────────────────────────────
+mkdir -p src/{api,components/{ui,layout},hooks,pages/{auth,lists},store,types,utils}
 
-# ── Decoradores comunes ──────────────────────────────────────────
-cat > src/common/decorators/public.decorator.ts << 'EOF'
-import { SetMetadata } from '@nestjs/common';
+# ── Tipos globales ────────────────────────────────────────────────
+cat > src/types/index.ts << 'EOF'
+export type Role = 'ADMIN' | 'USER';
+export type Visibility = 'PUBLIC' | 'PRIVATE';
 
-export const IS_PUBLIC_KEY = 'isPublic';
-/** Marca un endpoint como público (no requiere JWT) */
-export const Public = () => SetMetadata(IS_PUBLIC_KEY, true);
+export interface User {
+  id: string;
+  username: string;
+  role: Role;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Item {
+  id: string;
+  name: string;
+  description?: string;
+  order: number;
+  listId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface List {
+  id: string;
+  name: string;
+  visibility: Visibility;
+  ownerId: string;
+  owner?: Pick<User, 'id' | 'username'>;
+  items?: Item[];
+  _count?: { items: number };
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Invitation {
+  id: string;
+  token: string;
+  reference?: string;
+  used: boolean;
+  expiresAt: string;
+  createdAt: string;
+  invitationUrl?: string;
+}
+
+export interface ApiError {
+  message: string | string[];
+  statusCode: number;
+  error?: string;
+}
 EOF
 
-cat > src/common/decorators/roles.decorator.ts << 'EOF'
-import { SetMetadata } from '@nestjs/common';
-import { Role } from '@prisma/client';
+# ── Cliente HTTP ──────────────────────────────────────────────────
+cat > src/api/client.ts << 'EOF'
+import { ApiError } from '../types';
 
-export const ROLES_KEY = 'roles';
-/** Restringe el endpoint a los roles indicados */
-export const Roles = (...roles: Role[]) => SetMetadata(ROLES_KEY, roles);
+const BASE_URL = '/api/v1';
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const token = localStorage.getItem('accessToken');
+
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    credentials: 'include',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options.headers,
+    },
+  });
+
+  if (!res.ok) {
+    const error: ApiError = await res.json().catch(() => ({
+      message: 'Error de red',
+      statusCode: res.status,
+    }));
+    throw error;
+  }
+
+  // 204 No Content
+  if (res.status === 204) return undefined as T;
+
+  return res.json() as Promise<T>;
+}
+
+export const api = {
+  get: <T>(path: string) => request<T>(path),
+  post: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'POST', body: JSON.stringify(body) }),
+  patch: <T>(path: string, body?: unknown) =>
+    request<T>(path, { method: 'PATCH', body: JSON.stringify(body) }),
+  delete: <T>(path: string) => request<T>(path, { method: 'DELETE' }),
+};
 EOF
 
-cat > src/common/decorators/current-user.decorator.ts << 'EOF'
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { User } from '@prisma/client';
+# ── API por dominio ───────────────────────────────────────────────
+cat > src/api/auth.api.ts << 'EOF'
+import { User } from '../types';
+import { api } from './client';
 
-/** Inyecta el usuario autenticado en el parámetro del controlador */
-export const CurrentUser = createParamDecorator(
-  (_data: unknown, ctx: ExecutionContext): User => {
-    const request = ctx.switchToHttp().getRequest();
-    return request.user as User;
+export interface LoginPayload { username: string; password: string; }
+export interface RegisterPayload { invitationToken: string; username: string; password: string; }
+export interface TokenResponse { accessToken: string; }
+
+export const authApi = {
+  login: (data: LoginPayload) => api.post<TokenResponse>('/auth/login', data),
+  register: (data: RegisterPayload) => api.post<TokenResponse>('/auth/register', data),
+  refresh: () => api.post<TokenResponse>('/auth/refresh'),
+  logout: () => api.post<void>('/auth/logout'),
+  me: () => api.get<User>('/auth/me'),
+};
+EOF
+
+cat > src/api/lists.api.ts << 'EOF'
+import { Item, List } from '../types';
+import { api } from './client';
+
+export interface CreateListPayload { name: string; visibility?: 'PUBLIC' | 'PRIVATE'; }
+export interface UpdateListPayload { name?: string; visibility?: 'PUBLIC' | 'PRIVATE'; }
+export interface CreateItemPayload { name: string; description?: string; }
+export interface UpdateItemPayload { name?: string; description?: string; }
+
+export const listsApi = {
+  findMine: () => api.get<List[]>('/lists'),
+  findPublic: () => api.get<List[]>('/lists/public'),
+  findById: (id: string) => api.get<List>(`/lists/${id}`),
+  create: (data: CreateListPayload) => api.post<List>('/lists', data),
+  update: (id: string, data: UpdateListPayload) => api.patch<List>(`/lists/${id}`, data),
+  delete: (id: string) => api.delete<void>(`/lists/${id}`),
+
+  createItem: (listId: string, data: CreateItemPayload) =>
+    api.post<Item>(`/lists/${listId}/items`, data),
+  updateItem: (listId: string, itemId: string, data: UpdateItemPayload) =>
+    api.patch<Item>(`/lists/${listId}/items/${itemId}`, data),
+  deleteItem: (listId: string, itemId: string) =>
+    api.delete<void>(`/lists/${listId}/items/${itemId}`),
+};
+EOF
+
+cat > src/api/invitations.api.ts << 'EOF'
+import { Invitation } from '../types';
+import { api } from './client';
+
+export const invitationsApi = {
+  create: (data: { reference?: string }) => api.post<Invitation & { invitationUrl: string }>('/invitations', data),
+  findAll: () => api.get<Invitation[]>('/invitations'),
+  validate: (token: string) => api.get<{ valid: true }>(`/invitations/validate?token=${token}`),
+};
+EOF
+
+cat > src/api/users.api.ts << 'EOF'
+import { User } from '../types';
+import { api } from './client';
+
+export const usersApi = {
+  findAll: () => api.get<User[]>('/users'),
+  deactivate: (id: string) => api.patch<User>(`/users/${id}/deactivate`),
+  activate: (id: string) => api.patch<User>(`/users/${id}/activate`),
+};
+EOF
+
+# ── Store de autenticación (Zustand) ──────────────────────────────
+cat > src/store/auth.store.ts << 'EOF'
+import { create } from 'zustand';
+import { User } from '../types';
+
+interface AuthState {
+  user: User | null;
+  accessToken: string | null;
+  setAuth: (user: User, token: string) => void;
+  clearAuth: () => void;
+}
+
+export const useAuthStore = create<AuthState>((set) => ({
+  user: null,
+  accessToken: localStorage.getItem('accessToken'),
+
+  setAuth: (user, token) => {
+    localStorage.setItem('accessToken', token);
+    set({ user, accessToken: token });
   },
+
+  clearAuth: () => {
+    localStorage.removeItem('accessToken');
+    set({ user: null, accessToken: null });
+  },
+}));
+EOF
+
+# ── Hooks de datos ────────────────────────────────────────────────
+cat > src/hooks/useAuth.ts << 'EOF'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
+import { authApi, LoginPayload, RegisterPayload } from '../api/auth.api';
+import { useAuthStore } from '../store/auth.store';
+
+export function useMe() {
+  const token = useAuthStore((s) => s.accessToken);
+  return useQuery({
+    queryKey: ['me'],
+    queryFn: authApi.me,
+    enabled: !!token,
+    retry: false,
+  });
+}
+
+export function useLogin() {
+  const { setAuth } = useAuthStore();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (data: LoginPayload) => authApi.login(data),
+    onSuccess: async (res) => {
+      localStorage.setItem('accessToken', res.accessToken);
+      const user = await authApi.me();
+      setAuth(user, res.accessToken);
+      queryClient.invalidateQueries({ queryKey: ['me'] });
+    },
+  });
+}
+
+export function useRegister() {
+  const { setAuth } = useAuthStore();
+
+  return useMutation({
+    mutationFn: (data: RegisterPayload) => authApi.register(data),
+    onSuccess: async (res) => {
+      localStorage.setItem('accessToken', res.accessToken);
+      const user = await authApi.me();
+      setAuth(user, res.accessToken);
+    },
+  });
+}
+
+export function useLogout() {
+  const { clearAuth } = useAuthStore();
+  const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: authApi.logout,
+    onSettled: () => {
+      clearAuth();
+      queryClient.clear();
+      navigate('/login');
+    },
+  });
+}
+EOF
+
+cat > src/hooks/useLists.ts << 'EOF'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { CreateItemPayload, CreateListPayload, listsApi, UpdateListPayload } from '../api/lists.api';
+
+export function useMyLists() {
+  return useQuery({ queryKey: ['lists', 'mine'], queryFn: listsApi.findMine });
+}
+
+export function usePublicLists() {
+  return useQuery({ queryKey: ['lists', 'public'], queryFn: listsApi.findPublic });
+}
+
+export function useList(id: string) {
+  return useQuery({ queryKey: ['lists', id], queryFn: () => listsApi.findById(id) });
+}
+
+export function useCreateList() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateListPayload) => listsApi.create(data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['lists', 'mine'] }),
+  });
+}
+
+export function useUpdateList() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: UpdateListPayload }) =>
+      listsApi.update(id, data),
+    onSuccess: (_res, { id }) => {
+      qc.invalidateQueries({ queryKey: ['lists', 'mine'] });
+      qc.invalidateQueries({ queryKey: ['lists', id] });
+    },
+  });
+}
+
+export function useDeleteList() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => listsApi.delete(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['lists', 'mine'] }),
+  });
+}
+
+export function useCreateItem(listId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (data: CreateItemPayload) => listsApi.createItem(listId, data),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['lists', listId] }),
+  });
+}
+
+export function useDeleteItem(listId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (itemId: string) => listsApi.deleteItem(listId, itemId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['lists', listId] }),
+  });
+}
+EOF
+
+# ── Componentes UI base ───────────────────────────────────────────
+cat > src/components/ui/Button.tsx << 'EOF'
+import { ButtonHTMLAttributes } from 'react';
+
+interface Props extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variante?: 'primary' | 'secondary' | 'danger';
+  cargando?: boolean;
+}
+
+const clases = {
+  primary: 'bg-indigo-600 hover:bg-indigo-700 text-white',
+  secondary: 'bg-gray-200 hover:bg-gray-300 text-gray-800',
+  danger: 'bg-red-600 hover:bg-red-700 text-white',
+};
+
+export function Button({ variante = 'primary', cargando, children, className = '', disabled, ...props }: Props) {
+  return (
+    <button
+      {...props}
+      disabled={disabled ?? cargando}
+      className={`px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${clases[variante]} ${className}`}
+    >
+      {cargando ? 'Cargando...' : children}
+    </button>
+  );
+}
+EOF
+
+cat > src/components/ui/Input.tsx << 'EOF'
+import { InputHTMLAttributes, forwardRef } from 'react';
+
+interface Props extends InputHTMLAttributes<HTMLInputElement> {
+  label: string;
+  error?: string;
+}
+
+export const Input = forwardRef<HTMLInputElement, Props>(
+  ({ label, error, className = '', ...props }, ref) => (
+    <div className="flex flex-col gap-1">
+      <label className="text-sm font-medium text-gray-700">{label}</label>
+      <input
+        ref={ref}
+        {...props}
+        className={`border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500
+          ${error ? 'border-red-500' : 'border-gray-300'} ${className}`}
+      />
+      {error && <p className="text-xs text-red-600">{error}</p>}
+    </div>
+  ),
 );
+Input.displayName = 'Input';
 EOF
 
-# ── Guards ───────────────────────────────────────────────────────
-cat > src/auth/guards/jwt-auth.guard.ts << 'EOF'
-import { ExecutionContext, Injectable } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { AuthGuard } from '@nestjs/passport';
-import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
+cat > src/components/ui/Modal.tsx << 'EOF'
+import { ReactNode } from 'react';
 
-@Injectable()
-export class JwtAuthGuard extends AuthGuard('jwt') {
-  constructor(private reflector: Reflector) {
-    super();
-  }
+interface Props {
+  abierto: boolean;
+  titulo: string;
+  onCerrar: () => void;
+  children: ReactNode;
+}
 
-  canActivate(context: ExecutionContext) {
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (isPublic) return true;
-    return super.canActivate(context);
-  }
+export function Modal({ abierto, titulo, onCerrar, children }: Props) {
+  if (!abierto) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-800">{titulo}</h2>
+          <button onClick={onCerrar} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
 }
 EOF
 
-cat > src/auth/guards/roles.guard.ts << 'EOF'
-import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { Role } from '@prisma/client';
-import { ROLES_KEY } from '../../common/decorators/roles.decorator';
+cat > src/components/ui/Badge.tsx << 'EOF'
+interface Props {
+  texto: string;
+  variante?: 'green' | 'gray' | 'red' | 'indigo';
+}
 
-@Injectable()
-export class RolesGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+const clases = {
+  green: 'bg-green-100 text-green-700',
+  gray: 'bg-gray-100 text-gray-600',
+  red: 'bg-red-100 text-red-700',
+  indigo: 'bg-indigo-100 text-indigo-700',
+};
 
-  canActivate(context: ExecutionContext): boolean {
-    const rolesRequeridos = this.reflector.getAllAndOverride<Role[]>(ROLES_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-    if (!rolesRequeridos) return true;
-    const { user } = context.switchToHttp().getRequest();
-    return rolesRequeridos.includes(user?.role);
-  }
+export function Badge({ texto, variante = 'gray' }: Props) {
+  return (
+    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${clases[variante]}`}>
+      {texto}
+    </span>
+  );
 }
 EOF
 
-cat > src/auth/guards/jwt-refresh.guard.ts << 'EOF'
-import { Injectable } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
+# ── Layout ────────────────────────────────────────────────────────
+cat > src/components/layout/Navbar.tsx << 'EOF'
+import { Link, NavLink } from 'react-router-dom';
+import { useAuthStore } from '../../store/auth.store';
+import { useLogout } from '../../hooks/useAuth';
+import { Button } from '../ui/Button';
 
-@Injectable()
-export class JwtRefreshGuard extends AuthGuard('jwt-refresh') {}
-EOF
+export function Navbar() {
+  const user = useAuthStore((s) => s.user);
+  const logout = useLogout();
 
-# ── Estrategias JWT ───────────────────────────────────────────────
-cat > src/auth/strategies/jwt.strategy.ts << 'EOF'
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
-import { UsersService } from '../../users/users.service';
-
-export interface JwtPayload {
-  sub: string;
-  username: string;
-  role: string;
-}
-
-@Injectable()
-export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
-  constructor(
-    configService: ConfigService,
-    private readonly usersService: UsersService,
-  ) {
-    super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      ignoreExpiration: false,
-      secretOrKey: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
-    });
-  }
-
-  async validate(payload: JwtPayload) {
-    const user = await this.usersService.findById(payload.sub);
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException('Usuario no autorizado');
-    }
-    return user;
-  }
-}
-EOF
-
-cat > src/auth/strategies/jwt-refresh.strategy.ts << 'EOF'
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { PassportStrategy } from '@nestjs/passport';
-import { ExtractJwt, Strategy } from 'passport-jwt';
-import { Request } from 'express';
-import { PrismaService } from '../../prisma/prisma.service';
-
-@Injectable()
-export class JwtRefreshStrategy extends PassportStrategy(Strategy, 'jwt-refresh') {
-  constructor(
-    configService: ConfigService,
-    private readonly prisma: PrismaService,
-  ) {
-    super({
-      jwtFromRequest: ExtractJwt.fromExtractors([
-        (req: Request) => req?.cookies?.refreshToken as string | null,
-      ]),
-      ignoreExpiration: false,
-      secretOrKey: configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
-      passReqToCallback: true,
-    });
-  }
-
-  async validate(req: Request) {
-    const refreshToken = req.cookies?.refreshToken as string | undefined;
-    if (!refreshToken) throw new UnauthorizedException('Refresh token no encontrado');
-
-    const token = await this.prisma.refreshToken.findUnique({
-      where: { token: refreshToken },
-      include: { user: true },
-    });
-
-    if (!token || token.revoked || token.expiresAt < new Date()) {
-      throw new UnauthorizedException('Refresh token inválido o expirado');
-    }
-    if (!token.user.isActive) {
-      throw new UnauthorizedException('Usuario desactivado');
-    }
-    return { ...token.user, refreshToken };
-  }
+  return (
+    <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+      <Link to="/" className="text-xl font-bold text-indigo-600">🎁 EntreRegalos</Link>
+      <div className="flex items-center gap-6">
+        <NavLink
+          to="/listas"
+          className={({ isActive }) =>
+            `text-sm font-medium ${isActive ? 'text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`
+          }
+        >
+          Mis listas
+        </NavLink>
+        <NavLink
+          to="/descubrir"
+          className={({ isActive }) =>
+            `text-sm font-medium ${isActive ? 'text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`
+          }
+        >
+          Descubrir
+        </NavLink>
+        {user?.role === 'ADMIN' && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) =>
+              `text-sm font-medium ${isActive ? 'text-indigo-600' : 'text-gray-600 hover:text-gray-900'}`
+            }
+          >
+            Admin
+          </NavLink>
+        )}
+        <span className="text-sm text-gray-500">@{user?.username}</span>
+        <Button variante="secondary" onClick={() => logout.mutate()} cargando={logout.isPending}>
+          Cerrar sesión
+        </Button>
+      </div>
+    </nav>
+  );
 }
 EOF
 
-# ── DTOs ─────────────────────────────────────────────────────────
-cat > src/auth/dto/login.dto.ts << 'EOF'
-import { IsNotEmpty, IsString } from 'class-validator';
+cat > src/components/layout/AppLayout.tsx << 'EOF'
+import { Outlet } from 'react-router-dom';
+import { Navbar } from './Navbar';
 
-export class LoginDto {
-  @IsString()
-  @IsNotEmpty({ message: 'El nombre de usuario es obligatorio' })
-  username: string;
-
-  @IsString()
-  @IsNotEmpty({ message: 'La contraseña es obligatoria' })
-  password: string;
+export function AppLayout() {
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <Navbar />
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        <Outlet />
+      </main>
+    </div>
+  );
 }
 EOF
 
-cat > src/auth/dto/register.dto.ts << 'EOF'
-import { IsNotEmpty, IsString, IsUUID, Matches, MaxLength, MinLength } from 'class-validator';
+cat > src/components/layout/AuthLayout.tsx << 'EOF'
+import { Outlet } from 'react-router-dom';
 
-export class RegisterDto {
-  @IsUUID('4', { message: 'El token de invitación no es válido' })
-  invitationToken: string;
-
-  @IsString()
-  @MinLength(3, { message: 'El nombre de usuario debe tener al menos 3 caracteres' })
-  @MaxLength(30, { message: 'El nombre de usuario no puede superar los 30 caracteres' })
-  @Matches(/^[a-z0-9_]+$/, {
-    message: 'El nombre de usuario solo puede contener letras minúsculas, números y guiones bajos',
-  })
-  username: string;
-
-  @IsString()
-  @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
-  @IsNotEmpty({ message: 'La contraseña es obligatoria' })
-  password: string;
+export function AuthLayout() {
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 to-white flex items-center justify-center p-4">
+      <div className="w-full max-w-sm">
+        <h1 className="text-3xl font-bold text-center text-indigo-600 mb-8">🎁 EntreRegalos</h1>
+        <Outlet />
+      </div>
+    </div>
+  );
 }
 EOF
 
-# ── Users ────────────────────────────────────────────────────────
-cat > src/users/users.repository.ts << 'EOF'
-import { Injectable } from '@nestjs/common';
-import { Prisma, User } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+# ── Guards de rutas ───────────────────────────────────────────────
+cat > src/components/layout/RequireAuth.tsx << 'EOF'
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuthStore } from '../../store/auth.store';
+import { useMe } from '../../hooks/useAuth';
 
-@Injectable()
-export class UsersRepository {
-  constructor(private readonly prisma: PrismaService) {}
+export function RequireAuth() {
+  const token = useAuthStore((s) => s.accessToken);
+  const { setAuth } = useAuthStore();
+  const { data: user, isLoading } = useMe();
 
-  findByUsername(username: string): Promise<User | null> {
-    return this.prisma.user.findUnique({ where: { username } });
+  if (!token) return <Navigate to="/login" replace />;
+  if (isLoading) return <div className="flex justify-center mt-20 text-gray-500">Cargando...</div>;
+  if (!user) return <Navigate to="/login" replace />;
+
+  // Sincronizar usuario en el store si no estaba
+  if (!useAuthStore.getState().user) {
+    setAuth(user, token);
   }
 
-  findById(id: string): Promise<User | null> {
-    return this.prisma.user.findUnique({ where: { id } });
-  }
-
-  findAll(): Promise<User[]> {
-    return this.prisma.user.findMany({ orderBy: { createdAt: 'asc' } });
-  }
-
-  create(data: Prisma.UserCreateInput): Promise<User> {
-    return this.prisma.user.create({ data });
-  }
-
-  update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
-    return this.prisma.user.update({ where: { id }, data });
-  }
+  return <Outlet />;
 }
 EOF
 
-cat > src/users/users.service.ts << 'EOF'
-import { Injectable } from '@nestjs/common';
-import { Prisma, User } from '@prisma/client';
-import { UsersRepository } from './users.repository';
+cat > src/components/layout/RequireAdmin.tsx << 'EOF'
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuthStore } from '../../store/auth.store';
 
-@Injectable()
-export class UsersService {
-  constructor(private readonly usersRepository: UsersRepository) {}
-
-  findByUsername(username: string): Promise<User | null> {
-    return this.usersRepository.findByUsername(username);
-  }
-
-  findById(id: string): Promise<User | null> {
-    return this.usersRepository.findById(id);
-  }
-
-  findAll(): Promise<User[]> {
-    return this.usersRepository.findAll();
-  }
-
-  create(data: Prisma.UserCreateInput): Promise<User> {
-    return this.usersRepository.create(data);
-  }
-
-  update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
-    return this.usersRepository.update(id, data);
-  }
+export function RequireAdmin() {
+  const user = useAuthStore((s) => s.user);
+  if (user?.role !== 'ADMIN') return <Navigate to="/listas" replace />;
+  return <Outlet />;
 }
 EOF
 
-cat > src/users/users.module.ts << 'EOF'
-import { Module } from '@nestjs/common';
-import { UsersService } from './users.service';
-import { UsersRepository } from './users.repository';
-import { UsersController } from './users.controller';
+# ── Páginas de autenticación ──────────────────────────────────────
+cat > src/pages/auth/LoginPage.tsx << 'EOF'
+import { useState, FormEvent } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
+import { useLogin } from '../../hooks/useAuth';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { ApiError } from '../../types';
 
-@Module({
-  controllers: [UsersController],
-  providers: [UsersService, UsersRepository],
-  exports: [UsersService],
-})
-export class UsersModule {}
-EOF
+export default function LoginPage() {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const navigate = useNavigate();
+  const login = useLogin();
 
-cat > src/users/users.controller.ts << 'EOF'
-import {
-  BadRequestException,
-  Controller,
-  Get,
-  NotFoundException,
-  Param,
-  Patch,
-} from '@nestjs/common';
-import { Role } from '@prisma/client';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
-import { UsersService } from './users.service';
-import { User } from '@prisma/client';
-
-@Roles(Role.ADMIN)
-@Controller('users')
-export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
-
-  @Get()
-  async findAll() {
-    const users = await this.usersService.findAll();
-    return users.map(({ passwordHash: _, ...u }) => u);
-  }
-
-  @Patch(':id/deactivate')
-  async deactivate(@Param('id') id: string, @CurrentUser() admin: User) {
-    if (id === admin.id) {
-      throw new BadRequestException('No puedes desactivarte a ti mismo');
-    }
-    const user = await this.usersService.findById(id);
-    if (!user) throw new NotFoundException('Usuario no encontrado');
-    const updated = await this.usersService.update(id, { isActive: false });
-    const { passwordHash: _, ...result } = updated;
-    return result;
-  }
-
-  @Patch(':id/activate')
-  async activate(@Param('id') id: string) {
-    const user = await this.usersService.findById(id);
-    if (!user) throw new NotFoundException('Usuario no encontrado');
-    const updated = await this.usersService.update(id, { isActive: true });
-    const { passwordHash: _, ...result } = updated;
-    return result;
-  }
-}
-EOF
-
-# ── Auth Service ─────────────────────────────────────────────────
-cat > src/auth/auth.service.ts << 'EOF'
-import {
-  ConflictException,
-  GoneException,
-  Injectable,
-  NotFoundException,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
-import { User } from '@prisma/client';
-import * as bcrypt from 'bcrypt';
-import { PrismaService } from '../prisma/prisma.service';
-import { UsersService } from '../users/users.service';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
-
-@Injectable()
-export class AuthService {
-  constructor(
-    private readonly usersService: UsersService,
-    private readonly jwtService: JwtService,
-    private readonly configService: ConfigService,
-    private readonly prisma: PrismaService,
-  ) {}
-
-  async login(dto: LoginDto): Promise<{ accessToken: string; refreshToken: string }> {
-    const user = await this.usersService.findByUsername(dto.username);
-    if (!user || !user.isActive) {
-      throw new UnauthorizedException('Credenciales incorrectas');
-    }
-    const valida = await bcrypt.compare(dto.password, user.passwordHash);
-    if (!valida) {
-      throw new UnauthorizedException('Credenciales incorrectas');
-    }
-    return this.generarTokens(user);
-  }
-
-  async register(dto: RegisterDto): Promise<{ accessToken: string; refreshToken: string }> {
-    const invitacion = await this.prisma.invitation.findUnique({
-      where: { token: dto.invitationToken },
-    });
-    if (!invitacion) throw new NotFoundException('Invitación no encontrada');
-    if (invitacion.used || invitacion.expiresAt < new Date()) {
-      throw new GoneException('La invitación ha expirado o ya ha sido utilizada');
-    }
-
-    const existe = await this.usersService.findByUsername(dto.username);
-    if (existe) throw new ConflictException('El nombre de usuario ya está en uso');
-
-    const hash = await bcrypt.hash(dto.password, 10);
-    const usuario = await this.usersService.create({
-      username: dto.username,
-      passwordHash: hash,
-    });
-
-    await this.prisma.invitation.update({
-      where: { id: invitacion.id },
-      data: { used: true },
-    });
-
-    return this.generarTokens(usuario);
-  }
-
-  async refresh(refreshToken: string): Promise<{ accessToken: string }> {
-    const token = await this.prisma.refreshToken.findUnique({
-      where: { token: refreshToken },
-      include: { user: true },
-    });
-    if (!token || token.revoked || token.expiresAt < new Date()) {
-      throw new UnauthorizedException('Refresh token inválido o expirado');
-    }
-    if (!token.user.isActive) {
-      throw new UnauthorizedException('Usuario desactivado');
-    }
-    return { accessToken: this.generarAccessToken(token.user) };
-  }
-
-  async logout(refreshToken: string): Promise<void> {
-    await this.prisma.refreshToken.updateMany({
-      where: { token: refreshToken },
-      data: { revoked: true },
-    });
-  }
-
-  private async generarTokens(user: User): Promise<{ accessToken: string; refreshToken: string }> {
-    const accessToken = this.generarAccessToken(user);
-    const refreshToken = crypto.randomUUID();
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    await this.prisma.refreshToken.create({
-      data: { token: refreshToken, userId: user.id, expiresAt },
-    });
-    return { accessToken, refreshToken };
-  }
-
-  private generarAccessToken(user: User): string {
-    return this.jwtService.sign(
-      { sub: user.id, username: user.username, role: user.role },
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    login.mutate(
+      { username, password },
       {
-        secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRES_IN') ?? '15m',
+        onSuccess: () => navigate('/listas'),
+        onError: (err) => {
+          const apiError = err as ApiError;
+          setError(
+            Array.isArray(apiError.message) ? apiError.message[0] : apiError.message,
+          );
+        },
       },
     );
-  }
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-md p-8 flex flex-col gap-4">
+      <h2 className="text-xl font-semibold text-gray-800">Iniciar sesión</h2>
+      {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
+      <Input
+        label="Usuario"
+        type="text"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        autoComplete="username"
+        required
+      />
+      <Input
+        label="Contraseña"
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        autoComplete="current-password"
+        required
+      />
+      <Button type="submit" cargando={login.isPending} className="w-full">
+        Entrar
+      </Button>
+      <p className="text-sm text-center text-gray-500">
+        ¿Tienes una invitación?{' '}
+        <Link to="/register" className="text-indigo-600 hover:underline">Regístrate</Link>
+      </p>
+    </form>
+  );
 }
 EOF
 
-# ── Auth Controller ───────────────────────────────────────────────
-cat > src/auth/auth.controller.ts << 'EOF'
-import {
-  Body,
-  Controller,
-  Get,
-  HttpCode,
-  HttpStatus,
-  Post,
-  Req,
-  Res,
-  UnauthorizedException,
-} from '@nestjs/common';
-import { Request, Response } from 'express';
-import { User } from '@prisma/client';
-import { Public } from '../common/decorators/public.decorator';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { AuthService } from './auth.service';
-import { LoginDto } from './dto/login.dto';
-import { RegisterDto } from './dto/register.dto';
+cat > src/pages/auth/RegisterPage.tsx << 'EOF'
+import { useState, FormEvent } from 'react';
+import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useRegister } from '../../hooks/useAuth';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { ApiError } from '../../types';
 
-@Controller('auth')
-export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+export default function RegisterPage() {
+  const [searchParams] = useSearchParams();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const invitationToken = searchParams.get('token') ?? '';
+  const navigate = useNavigate();
+  const register = useRegister();
 
-  @Public()
-  @Post('login')
-  @HttpCode(HttpStatus.OK)
-  async login(@Body() dto: LoginDto, @Res({ passthrough: true }) res: Response) {
-    const { accessToken, refreshToken } = await this.authService.login(dto);
-    this.setCookieRefresh(res, refreshToken);
-    return { accessToken };
-  }
-
-  @Public()
-  @Post('register')
-  @HttpCode(HttpStatus.CREATED)
-  async register(@Body() dto: RegisterDto, @Res({ passthrough: true }) res: Response) {
-    const { accessToken, refreshToken } = await this.authService.register(dto);
-    this.setCookieRefresh(res, refreshToken);
-    return { accessToken };
-  }
-
-  @Public()
-  @Post('refresh')
-  @HttpCode(HttpStatus.OK)
-  async refresh(@Req() req: Request) {
-    const refreshToken = req.cookies?.refreshToken as string | undefined;
-    if (!refreshToken) throw new UnauthorizedException('Refresh token no encontrado');
-    return this.authService.refresh(refreshToken);
-  }
-
-  @Post('logout')
-  @HttpCode(HttpStatus.OK)
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const refreshToken = req.cookies?.refreshToken as string | undefined;
-    if (refreshToken) await this.authService.logout(refreshToken);
-    res.clearCookie('refreshToken');
-    return { message: 'Sesión cerrada correctamente' };
-  }
-
-  @Get('me')
-  me(@CurrentUser() user: User) {
-    const { passwordHash: _, ...datos } = user;
-    return datos;
-  }
-
-  private setCookieRefresh(res: Response, refreshToken: string): void {
-    res.cookie('refreshToken', refreshToken, {
-      httpOnly: true,
-      secure: process.env['NODE_ENV'] === 'production',
-      sameSite: 'strict',
-      path: '/api/v1/auth/refresh',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
-    });
-  }
-}
-EOF
-
-# ── Auth Module ───────────────────────────────────────────────────
-cat > src/auth/auth.module.ts << 'EOF'
-import { Module } from '@nestjs/common';
-import { APP_GUARD } from '@nestjs/core';
-import { JwtModule } from '@nestjs/jwt';
-import { PassportModule } from '@nestjs/passport';
-import { AuthController } from './auth.controller';
-import { AuthService } from './auth.service';
-import { JwtAuthGuard } from './guards/jwt-auth.guard';
-import { RolesGuard } from './guards/roles.guard';
-import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
-import { JwtStrategy } from './strategies/jwt.strategy';
-import { UsersModule } from '../users/users.module';
-
-@Module({
-  imports: [UsersModule, PassportModule, JwtModule.register({})],
-  controllers: [AuthController],
-  providers: [
-    AuthService,
-    JwtStrategy,
-    JwtRefreshStrategy,
-    { provide: APP_GUARD, useClass: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: RolesGuard },
-  ],
-})
-export class AuthModule {}
-EOF
-
-# ── Invitations ───────────────────────────────────────────────────
-cat > src/invitations/dto/create-invitation.dto.ts << 'EOF'
-import { IsOptional, IsString, MaxLength } from 'class-validator';
-
-export class CreateInvitationDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(100, { message: 'La referencia no puede superar los 100 caracteres' })
-  reference?: string;
-}
-EOF
-
-cat > src/invitations/invitations.repository.ts << 'EOF'
-import { Injectable } from '@nestjs/common';
-import { Invitation, Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-
-@Injectable()
-export class InvitationsRepository {
-  constructor(private readonly prisma: PrismaService) {}
-
-  create(data: Prisma.InvitationCreateInput): Promise<Invitation> {
-    return this.prisma.invitation.create({ data });
-  }
-
-  findAll(): Promise<Invitation[]> {
-    return this.prisma.invitation.findMany({ orderBy: { createdAt: 'desc' } });
-  }
-
-  findByToken(token: string): Promise<Invitation | null> {
-    return this.prisma.invitation.findUnique({ where: { token } });
-  }
-}
-EOF
-
-cat > src/invitations/invitations.service.ts << 'EOF'
-import { GoneException, Injectable, NotFoundException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { Invitation } from '@prisma/client';
-import { InvitationsRepository } from './invitations.repository';
-import { CreateInvitationDto } from './dto/create-invitation.dto';
-
-@Injectable()
-export class InvitationsService {
-  constructor(
-    private readonly invitationsRepository: InvitationsRepository,
-    private readonly configService: ConfigService,
-  ) {}
-
-  async create(dto: CreateInvitationDto, createdById: string): Promise<Invitation & { invitationUrl: string }> {
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-    const invitation = await this.invitationsRepository.create({
-      reference: dto.reference,
-      expiresAt,
-      createdBy: { connect: { id: createdById } },
-    });
-    const frontendUrl = this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000';
-    return { ...invitation, invitationUrl: `${frontendUrl}/register?token=${invitation.token}` };
-  }
-
-  findAll(): Promise<Invitation[]> {
-    return this.invitationsRepository.findAll();
-  }
-
-  async validate(token: string): Promise<{ valid: true }> {
-    const invitation = await this.invitationsRepository.findByToken(token);
-    if (!invitation) throw new NotFoundException('Invitación no encontrada');
-    if (invitation.used || invitation.expiresAt < new Date()) {
-      throw new GoneException('La invitación ha expirado o ya ha sido utilizada');
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!invitationToken) {
+      setError('Se necesita un token de invitación válido.');
+      return;
     }
-    return { valid: true };
-  }
+    register.mutate(
+      { invitationToken, username, password },
+      {
+        onSuccess: () => navigate('/listas'),
+        onError: (err) => {
+          const apiError = err as ApiError;
+          setError(
+            Array.isArray(apiError.message) ? apiError.message[0] : apiError.message,
+          );
+        },
+      },
+    );
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-md p-8 flex flex-col gap-4">
+      <h2 className="text-xl font-semibold text-gray-800">Crear cuenta</h2>
+      {!invitationToken && (
+        <p className="text-sm text-amber-600 bg-amber-50 rounded-lg p-3">
+          Necesitas un enlace de invitación válido para registrarte.
+        </p>
+      )}
+      {error && <p className="text-sm text-red-600 bg-red-50 rounded-lg p-3">{error}</p>}
+      <Input
+        label="Usuario"
+        type="text"
+        value={username}
+        onChange={(e) => setUsername(e.target.value)}
+        placeholder="letras, números y _"
+        required
+      />
+      <Input
+        label="Contraseña"
+        type="password"
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        placeholder="Mínimo 8 caracteres"
+        required
+      />
+      <Button type="submit" cargando={register.isPending} className="w-full" disabled={!invitationToken}>
+        Registrarse
+      </Button>
+      <p className="text-sm text-center text-gray-500">
+        ¿Ya tienes cuenta?{' '}
+        <Link to="/login" className="text-indigo-600 hover:underline">Inicia sesión</Link>
+      </p>
+    </form>
+  );
 }
 EOF
 
-cat > src/invitations/invitations.controller.ts << 'EOF'
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
-import { Role } from '@prisma/client';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Public } from '../common/decorators/public.decorator';
-import { Roles } from '../common/decorators/roles.decorator';
-import { CreateInvitationDto } from './dto/create-invitation.dto';
-import { InvitationsService } from './invitations.service';
-import { User } from '@prisma/client';
+# ── Páginas de listas ─────────────────────────────────────────────
+cat > src/pages/lists/ListsPage.tsx << 'EOF'
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { useMyLists, useCreateList, useDeleteList } from '../../hooks/useLists';
+import { Button } from '../../components/ui/Button';
+import { Modal } from '../../components/ui/Modal';
+import { Input } from '../../components/ui/Input';
+import { Badge } from '../../components/ui/Badge';
 
-@Controller('invitations')
-export class InvitationsController {
-  constructor(private readonly invitationsService: InvitationsService) {}
+export default function ListsPage() {
+  const { data: listas, isLoading } = useMyLists();
+  const crearLista = useCreateList();
+  const borrarLista = useDeleteList();
+  const [modalAbierto, setModalAbierto] = useState(false);
+  const [nombre, setNombre] = useState('');
+  const [visibilidad, setVisibilidad] = useState<'PRIVATE' | 'PUBLIC'>('PRIVATE');
 
-  @Roles(Role.ADMIN)
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreateInvitationDto, @CurrentUser() user: User) {
-    return this.invitationsService.create(dto, user.id);
-  }
+  const handleCrear = () => {
+    if (!nombre.trim()) return;
+    crearLista.mutate(
+      { name: nombre.trim(), visibility: visibilidad },
+      { onSuccess: () => { setModalAbierto(false); setNombre(''); } },
+    );
+  };
 
-  @Roles(Role.ADMIN)
-  @Get()
-  findAll() {
-    return this.invitationsService.findAll();
-  }
+  if (isLoading) return <p className="text-gray-500">Cargando listas...</p>;
 
-  @Public()
-  @Get('validate')
-  validate(@Query('token') token: string) {
-    return this.invitationsService.validate(token);
-  }
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">Mis listas</h1>
+        <Button onClick={() => setModalAbierto(true)}>+ Nueva lista</Button>
+      </div>
+
+      {listas?.length === 0 && (
+        <p className="text-gray-500 text-center py-12">Aún no tienes listas. ¡Crea la primera!</p>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {listas?.map((lista) => (
+          <div key={lista.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-2">
+              <Link to={`/listas/${lista.id}`} className="font-semibold text-gray-800 hover:text-indigo-600 truncate">
+                {lista.name}
+              </Link>
+              <Badge
+                texto={lista.visibility === 'PUBLIC' ? 'Pública' : 'Privada'}
+                variante={lista.visibility === 'PUBLIC' ? 'indigo' : 'gray'}
+              />
+            </div>
+            <p className="text-sm text-gray-500">{lista._count?.items ?? 0} artículos</p>
+            <div className="flex gap-2 mt-auto">
+              <Link to={`/listas/${lista.id}`} className="text-sm text-indigo-600 hover:underline">Ver</Link>
+              <button
+                onClick={() => { if (confirm('¿Borrar esta lista?')) borrarLista.mutate(lista.id); }}
+                className="text-sm text-red-500 hover:underline ml-auto"
+              >
+                Borrar
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <Modal abierto={modalAbierto} titulo="Nueva lista" onCerrar={() => setModalAbierto(false)}>
+        <div className="flex flex-col gap-4">
+          <Input label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Navidad 2025" />
+          <div className="flex flex-col gap-1">
+            <label className="text-sm font-medium text-gray-700">Visibilidad</label>
+            <select
+              value={visibilidad}
+              onChange={(e) => setVisibilidad(e.target.value as 'PRIVATE' | 'PUBLIC')}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            >
+              <option value="PRIVATE">Privada</option>
+              <option value="PUBLIC">Pública</option>
+            </select>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variante="secondary" onClick={() => setModalAbierto(false)}>Cancelar</Button>
+            <Button onClick={handleCrear} cargando={crearLista.isPending}>Crear</Button>
+          </div>
+        </div>
+      </Modal>
+    </div>
+  );
 }
 EOF
 
-cat > src/invitations/invitations.module.ts << 'EOF'
-import { Module } from '@nestjs/common';
-import { InvitationsController } from './invitations.controller';
-import { InvitationsRepository } from './invitations.repository';
-import { InvitationsService } from './invitations.service';
+cat > src/pages/lists/ListDetailPage.tsx << 'EOF'
+import { useState, FormEvent } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { useList, useCreateItem, useDeleteItem } from '../../hooks/useLists';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Badge } from '../../components/ui/Badge';
 
-@Module({
-  controllers: [InvitationsController],
-  providers: [InvitationsService, InvitationsRepository],
-})
-export class InvitationsModule {}
-EOF
+export default function ListDetailPage() {
+  const { id = '' } = useParams<{ id: string }>();
+  const { data: lista, isLoading } = useList(id);
+  const crearItem = useCreateItem(id);
+  const borrarItem = useDeleteItem(id);
+  const [nombre, setNombre] = useState('');
+  const [descripcion, setDescripcion] = useState('');
 
-# ── Lists ─────────────────────────────────────────────────────────
-mkdir -p src/lists/dto
-mkdir -p src/items/dto
+  const handleAddItem = (e: FormEvent) => {
+    e.preventDefault();
+    if (!nombre.trim()) return;
+    crearItem.mutate(
+      { name: nombre.trim(), description: descripcion.trim() || undefined },
+      { onSuccess: () => { setNombre(''); setDescripcion(''); } },
+    );
+  };
 
-cat > src/lists/dto/create-list.dto.ts << 'EOF'
-import { IsEnum, IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
-import { Visibility } from '@prisma/client';
+  if (isLoading) return <p className="text-gray-500">Cargando...</p>;
+  if (!lista) return <p className="text-gray-500">Lista no encontrada.</p>;
 
-export class CreateListDto {
-  @IsString()
-  @IsNotEmpty({ message: 'El nombre de la lista es obligatorio' })
-  @MaxLength(100, { message: 'El nombre no puede superar los 100 caracteres' })
-  name: string;
+  return (
+    <div className="max-w-2xl mx-auto">
+      <div className="flex items-center gap-3 mb-2">
+        <Link to="/listas" className="text-sm text-gray-400 hover:text-gray-600">← Mis listas</Link>
+      </div>
+      <div className="flex items-center gap-3 mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">{lista.name}</h1>
+        <Badge
+          texto={lista.visibility === 'PUBLIC' ? 'Pública' : 'Privada'}
+          variante={lista.visibility === 'PUBLIC' ? 'indigo' : 'gray'}
+        />
+      </div>
 
-  @IsOptional()
-  @IsEnum(Visibility, { message: 'La visibilidad debe ser PUBLIC o PRIVATE' })
-  visibility?: Visibility;
+      {/* Formulario añadir ítem */}
+      <form onSubmit={handleAddItem} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-6 flex flex-col gap-3">
+        <h2 className="font-semibold text-gray-700">Añadir artículo</h2>
+        <Input label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Auriculares inalámbricos" />
+        <Input label="Descripción (opcional)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Enlace, color, talla..." />
+        <Button type="submit" cargando={crearItem.isPending} className="self-end">Añadir</Button>
+      </form>
+
+      {/* Lista de ítems */}
+      <ul className="flex flex-col gap-3">
+        {lista.items?.length === 0 && (
+          <p className="text-gray-400 text-center py-8">La lista está vacía. ¡Añade el primer artículo!</p>
+        )}
+        {lista.items?.map((item) => (
+          <li key={item.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex items-start justify-between gap-4">
+            <div>
+              <p className="font-medium text-gray-800">{item.name}</p>
+              {item.description && <p className="text-sm text-gray-500 mt-1">{item.description}</p>}
+            </div>
+            <button
+              onClick={() => { if (confirm('¿Borrar este artículo?')) borrarItem.mutate(item.id); }}
+              className="text-red-400 hover:text-red-600 text-sm shrink-0"
+            >
+              Borrar
+            </button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 EOF
 
-cat > src/lists/dto/update-list.dto.ts << 'EOF'
-import { IsEnum, IsOptional, IsString, MaxLength } from 'class-validator';
-import { Visibility } from '@prisma/client';
+cat > src/pages/lists/DiscoverPage.tsx << 'EOF'
+import { Link } from 'react-router-dom';
+import { usePublicLists } from '../../hooks/useLists';
+import { Badge } from '../../components/ui/Badge';
 
-export class UpdateListDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(100, { message: 'El nombre no puede superar los 100 caracteres' })
-  name?: string;
+export default function DiscoverPage() {
+  const { data: listas, isLoading } = usePublicLists();
 
-  @IsOptional()
-  @IsEnum(Visibility, { message: 'La visibilidad debe ser PUBLIC o PRIVATE' })
-  visibility?: Visibility;
+  if (isLoading) return <p className="text-gray-500">Cargando...</p>;
+
+  return (
+    <div>
+      <h1 className="text-2xl font-bold text-gray-800 mb-6">Descubrir listas públicas</h1>
+      {listas?.length === 0 && (
+        <p className="text-gray-500 text-center py-12">No hay listas públicas de otros usuarios todavía.</p>
+      )}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {listas?.map((lista) => (
+          <div key={lista.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-2">
+              <Link to={`/listas/${lista.id}`} className="font-semibold text-gray-800 hover:text-indigo-600 truncate">
+                {lista.name}
+              </Link>
+              <Badge texto="Pública" variante="indigo" />
+            </div>
+            <p className="text-sm text-gray-500">
+              De <span className="font-medium">@{lista.owner?.username}</span> · {lista._count?.items ?? 0} artículos
+            </p>
+            <Link to={`/listas/${lista.id}`} className="text-sm text-indigo-600 hover:underline mt-auto">
+              Ver lista →
+            </Link>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 EOF
 
-cat > src/lists/lists.repository.ts << 'EOF'
-import { Injectable } from '@nestjs/common';
-import { List, Prisma, Visibility } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
+# ── Página Admin ──────────────────────────────────────────────────
+mkdir -p src/pages/admin
 
-@Injectable()
-export class ListsRepository {
-  constructor(private readonly prisma: PrismaService) {}
+cat > src/pages/admin/AdminPage.tsx << 'EOF'
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { usersApi } from '../../api/users.api';
+import { invitationsApi } from '../../api/invitations.api';
+import { Button } from '../../components/ui/Button';
+import { Input } from '../../components/ui/Input';
+import { Badge } from '../../components/ui/Badge';
+import { useAuthStore } from '../../store/auth.store';
 
-  findAllByOwner(ownerId: string) {
-    return this.prisma.list.findMany({
-      where: { ownerId },
-      include: { _count: { select: { items: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+export default function AdminPage() {
+  const adminId = useAuthStore((s) => s.user?.id);
+  const qc = useQueryClient();
+  const [referencia, setReferencia] = useState('');
+  const [urlInvitacion, setUrlInvitacion] = useState('');
 
-  findPublic(excludeOwnerId: string) {
-    return this.prisma.list.findMany({
-      where: { visibility: Visibility.PUBLIC, ownerId: { not: excludeOwnerId } },
-      include: { owner: { select: { id: true, username: true } }, _count: { select: { items: true } } },
-      orderBy: { createdAt: 'desc' },
-    });
-  }
+  const { data: usuarios } = useQuery({ queryKey: ['users'], queryFn: usersApi.findAll });
+  const { data: invitaciones } = useQuery({ queryKey: ['invitations'], queryFn: invitationsApi.findAll });
 
-  findById(id: string) {
-    return this.prisma.list.findUnique({
-      where: { id },
-      include: { items: { orderBy: { order: 'asc' } }, owner: { select: { id: true, username: true } } },
-    });
-  }
+  const crearInvitacion = useMutation({
+    mutationFn: () => invitationsApi.create({ reference: referencia || undefined }),
+    onSuccess: (inv) => {
+      setUrlInvitacion(inv.invitationUrl ?? '');
+      setReferencia('');
+      qc.invalidateQueries({ queryKey: ['invitations'] });
+    },
+  });
 
-  create(data: Prisma.ListCreateInput): Promise<List> {
-    return this.prisma.list.create({ data });
-  }
+  const desactivar = useMutation({
+    mutationFn: (id: string) => usersApi.deactivate(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  });
 
-  update(id: string, data: Prisma.ListUpdateInput): Promise<List> {
-    return this.prisma.list.update({ where: { id }, data });
-  }
+  const activar = useMutation({
+    mutationFn: (id: string) => usersApi.activate(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
+  });
 
-  delete(id: string): Promise<List> {
-    return this.prisma.list.delete({ where: { id } });
-  }
+  return (
+    <div className="flex flex-col gap-10">
+      <h1 className="text-2xl font-bold text-gray-800">Panel de administración</h1>
+
+      {/* Invitaciones */}
+      <section>
+        <h2 className="text-lg font-semibold text-gray-700 mb-4">Invitaciones</h2>
+        <div className="flex gap-3 mb-4">
+          <Input label="Referencia (opcional)" value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="Ej. Para Ana" />
+          <div className="flex items-end">
+            <Button onClick={() => crearInvitacion.mutate()} cargando={crearInvitacion.isPending}>
+              Generar invitación
+            </Button>
+          </div>
+        </div>
+        {urlInvitacion && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
+            <p className="text-sm font-medium text-indigo-700 mb-1">Enlace de invitación generado:</p>
+            <p className="text-sm text-indigo-600 break-all">{urlInvitacion}</p>
+            <button
+              onClick={() => navigator.clipboard.writeText(urlInvitacion)}
+              className="text-xs text-indigo-500 hover:underline mt-1"
+            >
+              Copiar al portapapeles
+            </button>
+          </div>
+        )}
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="text-left text-gray-500 border-b border-gray-200">
+              <th className="py-2 pr-4">Referencia</th>
+              <th className="py-2 pr-4">Estado</th>
+              <th className="py-2 pr-4">Expira</th>
+            </tr>
+          </thead>
+          <tbody>
+            {invitaciones?.map((inv) => (
+              <tr key={inv.id} className="border-b border-gray-100">
+                <td className="py-2 pr-4 text-gray-700">{inv.reference ?? '—'}</td>
+                <td className="py-2 pr-4">
+                  <Badge
+                    texto={inv.used ? 'Usada' : new Date(inv.expiresAt) < new Date() ? 'Expirada' : 'Activa'}
+                    variante={inv.used ? 'gray' : new Date(inv.expiresAt) < new Date() ? 'red' : 'green'}
+                  />
+                </td>
+                <td className="py-2 pr-4 text-gray-500">{new Date(inv.expiresAt).toLocaleDateString('es-ES')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      {/* Usuarios */}
+      <section>
+        <h2 className="text-lg font-semibold text-gray-700 mb-4">Usuarios</h2>
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="text-left text-gray-500 border-b border-gray-200">
+              <th className="py-2 pr-4">Usuario</th>
+              <th className="py-2 pr-4">Rol</th>
+              <th className="py-2 pr-4">Estado</th>
+              <th className="py-2">Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            {usuarios?.map((u) => (
+              <tr key={u.id} className="border-b border-gray-100">
+                <td className="py-2 pr-4 font-medium text-gray-800">@{u.username}</td>
+                <td className="py-2 pr-4">
+                  <Badge texto={u.role} variante={u.role === 'ADMIN' ? 'indigo' : 'gray'} />
+                </td>
+                <td className="py-2 pr-4">
+                  <Badge texto={u.isActive ? 'Activo' : 'Inactivo'} variante={u.isActive ? 'green' : 'red'} />
+                </td>
+                <td className="py-2">
+                  {u.id !== adminId && (
+                    u.isActive
+                      ? <button onClick={() => desactivar.mutate(u.id)} className="text-red-500 hover:underline text-xs">Desactivar</button>
+                      : <button onClick={() => activar.mutate(u.id)} className="text-green-600 hover:underline text-xs">Activar</button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+    </div>
+  );
 }
 EOF
 
-cat > src/lists/lists.service.ts << 'EOF'
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { Visibility } from '@prisma/client';
-import { ListsRepository } from './lists.repository';
-import { CreateListDto } from './dto/create-list.dto';
-import { UpdateListDto } from './dto/update-list.dto';
+# ── Router principal ──────────────────────────────────────────────
+cat > src/App.tsx << 'EOF'
+import { lazy, Suspense } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { AppLayout } from './components/layout/AppLayout';
+import { AuthLayout } from './components/layout/AuthLayout';
+import { RequireAuth } from './components/layout/RequireAuth';
+import { RequireAdmin } from './components/layout/RequireAdmin';
 
-@Injectable()
-export class ListsService {
-  constructor(private readonly listsRepository: ListsRepository) {}
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
+const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
+const ListsPage = lazy(() => import('./pages/lists/ListsPage'));
+const ListDetailPage = lazy(() => import('./pages/lists/ListDetailPage'));
+const DiscoverPage = lazy(() => import('./pages/lists/DiscoverPage'));
+const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
 
-  findAllByOwner(ownerId: string) {
-    return this.listsRepository.findAllByOwner(ownerId);
-  }
+function Cargando() {
+  return <div className="flex justify-center mt-20 text-gray-400">Cargando...</div>;
+}
 
-  findPublic(userId: string) {
-    return this.listsRepository.findPublic(userId);
-  }
+export default function App() {
+  return (
+    <Suspense fallback={<Cargando />}>
+      <Routes>
+        {/* Rutas públicas */}
+        <Route element={<AuthLayout />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+        </Route>
 
-  async findById(id: string, userId: string) {
-    const list = await this.listsRepository.findById(id);
-    if (!list) throw new NotFoundException('Lista no encontrada');
-    if (list.visibility === Visibility.PRIVATE && list.ownerId !== userId) {
-      throw new ForbiddenException('No tienes acceso a esta lista');
-    }
-    return list;
-  }
+        {/* Rutas protegidas */}
+        <Route element={<RequireAuth />}>
+          <Route element={<AppLayout />}>
+            <Route path="/listas" element={<ListsPage />} />
+            <Route path="/listas/:id" element={<ListDetailPage />} />
+            <Route path="/descubrir" element={<DiscoverPage />} />
 
-  create(dto: CreateListDto, ownerId: string) {
-    return this.listsRepository.create({
-      name: dto.name,
-      visibility: dto.visibility ?? Visibility.PRIVATE,
-      owner: { connect: { id: ownerId } },
-    });
-  }
+            {/* Solo admin */}
+            <Route element={<RequireAdmin />}>
+              <Route path="/admin" element={<AdminPage />} />
+            </Route>
+          </Route>
+        </Route>
 
-  async update(id: string, dto: UpdateListDto, userId: string) {
-    const list = await this.listsRepository.findById(id);
-    if (!list) throw new NotFoundException('Lista no encontrada');
-    if (list.ownerId !== userId) throw new ForbiddenException('No puedes editar esta lista');
-    return this.listsRepository.update(id, dto);
-  }
-
-  async delete(id: string, userId: string) {
-    const list = await this.listsRepository.findById(id);
-    if (!list) throw new NotFoundException('Lista no encontrada');
-    if (list.ownerId !== userId) throw new ForbiddenException('No puedes eliminar esta lista');
-    return this.listsRepository.delete(id);
-  }
+        {/* Redireccionamiento raíz */}
+        <Route path="/" element={<Navigate to="/listas" replace />} />
+        <Route path="*" element={<Navigate to="/listas" replace />} />
+      </Routes>
+    </Suspense>
+  );
 }
 EOF
 
-cat > src/lists/lists.controller.ts << 'EOF'
-import {
-  Body, Controller, Delete, Get, HttpCode, HttpStatus,
-  Param, Patch, Post,
-} from '@nestjs/common';
-import { User } from '@prisma/client';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CreateListDto } from './dto/create-list.dto';
-import { UpdateListDto } from './dto/update-list.dto';
-import { ListsService } from './lists.service';
-
-@Controller('lists')
-export class ListsController {
-  constructor(private readonly listsService: ListsService) {}
-
-  @Get()
-  findMine(@CurrentUser() user: User) {
-    return this.listsService.findAllByOwner(user.id);
-  }
-
-  @Get('public')
-  findPublic(@CurrentUser() user: User) {
-    return this.listsService.findPublic(user.id);
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string, @CurrentUser() user: User) {
-    return this.listsService.findById(id, user.id);
-  }
-
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreateListDto, @CurrentUser() user: User) {
-    return this.listsService.create(dto, user.id);
-  }
-
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateListDto, @CurrentUser() user: User) {
-    return this.listsService.update(id, dto, user.id);
-  }
-
-  @Delete(':id')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  delete(@Param('id') id: string, @CurrentUser() user: User) {
-    return this.listsService.delete(id, user.id);
-  }
-}
-EOF
-
-cat > src/lists/lists.module.ts << 'EOF'
-import { Module } from '@nestjs/common';
-import { ListsController } from './lists.controller';
-import { ListsRepository } from './lists.repository';
-import { ListsService } from './lists.service';
-
-@Module({
-  controllers: [ListsController],
-  providers: [ListsService, ListsRepository],
-})
-export class ListsModule {}
-EOF
-
-# ── Items ─────────────────────────────────────────────────────────
-cat > src/items/dto/create-item.dto.ts << 'EOF'
-import { IsNotEmpty, IsOptional, IsString, MaxLength } from 'class-validator';
-
-export class CreateItemDto {
-  @IsString()
-  @IsNotEmpty({ message: 'El nombre del artículo es obligatorio' })
-  @MaxLength(200, { message: 'El nombre no puede superar los 200 caracteres' })
-  name: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500, { message: 'La descripción no puede superar los 500 caracteres' })
-  description?: string;
-}
-EOF
-
-cat > src/items/dto/update-item.dto.ts << 'EOF'
-import { IsOptional, IsString, MaxLength } from 'class-validator';
-
-export class UpdateItemDto {
-  @IsOptional()
-  @IsString()
-  @MaxLength(200)
-  name?: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  description?: string;
-}
-EOF
-
-cat > src/items/items.repository.ts << 'EOF'
-import { Injectable } from '@nestjs/common';
-import { Item, Prisma } from '@prisma/client';
-import { PrismaService } from '../prisma/prisma.service';
-
-@Injectable()
-export class ItemsRepository {
-  constructor(private readonly prisma: PrismaService) {}
-
-  create(data: Prisma.ItemCreateInput): Promise<Item> {
-    return this.prisma.item.create({ data });
-  }
-
-  findById(id: string): Promise<Item | null> {
-    return this.prisma.item.findUnique({ where: { id } });
-  }
-
-  update(id: string, data: Prisma.ItemUpdateInput): Promise<Item> {
-    return this.prisma.item.update({ where: { id }, data });
-  }
-
-  delete(id: string): Promise<Item> {
-    return this.prisma.item.delete({ where: { id } });
-  }
-}
-EOF
-
-cat > src/items/items.service.ts << 'EOF'
-import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { ItemsRepository } from './items.repository';
-import { ListsRepository } from '../lists/lists.repository';
-import { CreateItemDto } from './dto/create-item.dto';
-import { UpdateItemDto } from './dto/update-item.dto';
-
-@Injectable()
-export class ItemsService {
-  constructor(
-    private readonly itemsRepository: ItemsRepository,
-    private readonly listsRepository: ListsRepository,
-  ) {}
-
-  private async verificarPropietario(listId: string, userId: string) {
-    const list = await this.listsRepository.findById(listId);
-    if (!list) throw new NotFoundException('Lista no encontrada');
-    if (list.ownerId !== userId) throw new ForbiddenException('No puedes modificar esta lista');
-    return list;
-  }
-
-  async create(listId: string, dto: CreateItemDto, userId: string) {
-    await this.verificarPropietario(listId, userId);
-    return this.itemsRepository.create({
-      name: dto.name,
-      description: dto.description,
-      list: { connect: { id: listId } },
-    });
-  }
-
-  async update(listId: string, itemId: string, dto: UpdateItemDto, userId: string) {
-    await this.verificarPropietario(listId, userId);
-    const item = await this.itemsRepository.findById(itemId);
-    if (!item || item.listId !== listId) throw new NotFoundException('Artículo no encontrado');
-    return this.itemsRepository.update(itemId, dto);
-  }
-
-  async delete(listId: string, itemId: string, userId: string) {
-    await this.verificarPropietario(listId, userId);
-    const item = await this.itemsRepository.findById(itemId);
-    if (!item || item.listId !== listId) throw new NotFoundException('Artículo no encontrado');
-    return this.itemsRepository.delete(itemId);
-  }
-}
-EOF
-
-cat > src/items/items.controller.ts << 'EOF'
-import {
-  Body, Controller, Delete, HttpCode, HttpStatus,
-  Param, Patch, Post,
-} from '@nestjs/common';
-import { User } from '@prisma/client';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { CreateItemDto } from './dto/create-item.dto';
-import { UpdateItemDto } from './dto/update-item.dto';
-import { ItemsService } from './items.service';
-
-@Controller('lists/:listId/items')
-export class ItemsController {
-  constructor(private readonly itemsService: ItemsService) {}
-
-  @Post()
-  @HttpCode(HttpStatus.CREATED)
-  create(
-    @Param('listId') listId: string,
-    @Body() dto: CreateItemDto,
-    @CurrentUser() user: User,
-  ) {
-    return this.itemsService.create(listId, dto, user.id);
-  }
-
-  @Patch(':itemId')
-  update(
-    @Param('listId') listId: string,
-    @Param('itemId') itemId: string,
-    @Body() dto: UpdateItemDto,
-    @CurrentUser() user: User,
-  ) {
-    return this.itemsService.update(listId, itemId, dto, user.id);
-  }
-
-  @Delete(':itemId')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  delete(
-    @Param('listId') listId: string,
-    @Param('itemId') itemId: string,
-    @CurrentUser() user: User,
-  ) {
-    return this.itemsService.delete(listId, itemId, user.id);
-  }
-}
-EOF
-
-cat > src/items/items.module.ts << 'EOF'
-import { Module } from '@nestjs/common';
-import { ItemsController } from './items.controller';
-import { ItemsRepository } from './items.repository';
-import { ItemsService } from './items.service';
-import { ListsRepository } from '../lists/lists.repository';
-
-@Module({
-  controllers: [ItemsController],
-  providers: [ItemsService, ItemsRepository, ListsRepository],
-})
-export class ItemsModule {}
-EOF
-
-# ── App Module actualizado ────────────────────────────────────────
-cat > src/app.module.ts << 'EOF'
-import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
-import { AuthModule } from './auth/auth.module';
-import { InvitationsModule } from './invitations/invitations.module';
-import { ItemsModule } from './items/items.module';
-import { ListsModule } from './lists/lists.module';
-import { PrismaModule } from './prisma/prisma.module';
-import { UsersModule } from './users/users.module';
-
-@Module({
-  imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
-    PrismaModule,
-    AuthModule,
-    UsersModule,
-    InvitationsModule,
-    ListsModule,
-    ItemsModule,
-  ],
-})
-export class AppModule {}
-EOF
-
-echo "✅ Backend completo (T-007 a T-021) generado correctamente"
+echo "✅ Frontend completo generado correctamente"
