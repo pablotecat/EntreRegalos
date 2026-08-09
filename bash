@@ -1,3 +1,6 @@
+# Ejecutar desde: EntreRegalos/backend/
+
+cat > Dockerfile << 'EOF'
 # ── Fase de compilación ──────────────────────────────────────────
 FROM node:20-alpine AS builder
 
@@ -29,3 +32,6 @@ COPY --from=builder /app/dist ./dist
 EXPOSE 3001
 
 CMD ["node", "dist/main"]
+EOF
+
+echo "✅ Dockerfile del backend actualizado correctamente"
