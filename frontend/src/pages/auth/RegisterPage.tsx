@@ -26,7 +26,7 @@ export default function RegisterPage() {
       {
         onSuccess: () => navigate('/listas'),
         onError: (err) => {
-          const apiError = err as ApiError;
+          const apiError = err as unknown as ApiError;
           setError(
             Array.isArray(apiError.message) ? apiError.message[0] : apiError.message,
           );
