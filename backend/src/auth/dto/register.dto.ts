@@ -2,7 +2,7 @@ import { IsNotEmpty, IsString, IsUUID, Matches, MaxLength, MinLength } from 'cla
 
 export class RegisterDto {
   @IsUUID('4', { message: 'El token de invitación no es válido' })
-  invitationToken: string;
+  invitationToken!: string;
 
   @IsString()
   @MinLength(3, { message: 'El nombre de usuario debe tener al menos 3 caracteres' })
@@ -10,10 +10,10 @@ export class RegisterDto {
   @Matches(/^[a-z0-9_]+$/, {
     message: 'El nombre de usuario solo puede contener letras minúsculas, números y guiones bajos',
   })
-  username: string;
+  username!: string;
 
   @IsString()
   @MinLength(8, { message: 'La contraseña debe tener al menos 8 caracteres' })
   @IsNotEmpty({ message: 'La contraseña es obligatoria' })
-  password: string;
+  password!: string;
 }

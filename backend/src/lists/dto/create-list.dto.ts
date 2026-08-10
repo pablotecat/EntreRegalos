@@ -5,7 +5,7 @@ export class CreateListDto {
   @IsString()
   @IsNotEmpty({ message: 'El nombre de la lista es obligatorio' })
   @MaxLength(100, { message: 'El nombre no puede superar los 100 caracteres' })
-  name: string;
+  name!: string;
 
   @IsOptional()
   @IsEnum(Visibility, { message: 'La visibilidad debe ser PUBLIC o PRIVATE' })

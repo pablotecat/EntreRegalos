@@ -8,6 +8,8 @@ COPY prisma ./prisma/
 
 RUN npm ci
 
+RUN apk add --no-cache openssl
+
 COPY . .
 
 RUN npx prisma generate
@@ -25,7 +27,9 @@ COPY src ./src/
 
 RUN npm ci
 
-COPY --from=builder /app/dist ./dist
+RUN apk add --no-cache openssl
+
+COPY --from=builder /app/dist/src ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 EXPOSE 3001

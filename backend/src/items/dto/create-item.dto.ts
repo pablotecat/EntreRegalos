@@ -4,7 +4,7 @@ export class CreateItemDto {
   @IsString()
   @IsNotEmpty({ message: 'El nombre del artículo es obligatorio' })
   @MaxLength(200, { message: 'El nombre no puede superar los 200 caracteres' })
-  name: string;
+  name!: string;
 
   @IsOptional()
   @IsString()

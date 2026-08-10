@@ -25,8 +25,8 @@ export default function RegisterPage() {
       { invitationToken, username, password },
       {
         onSuccess: () => navigate('/listas'),
-        onError: (err) => {
-          const apiError = err as unknown as ApiError;
+        onError: (err: unknown) => {
+          const apiError = err as ApiError;
           setError(
             Array.isArray(apiError.message) ? apiError.message[0] : apiError.message,
           );
