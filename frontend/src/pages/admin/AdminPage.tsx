@@ -12,6 +12,7 @@ export default function AdminPage() {
   const qc = useQueryClient();
   const [referencia, setReferencia] = useState('');
   const [urlInvitacion, setUrlInvitacion] = useState('');
+  const [resetToken, setResetToken] = useState<string | null>(null);
 
   const { data: usuarios } = useQuery({ queryKey: ['users'], queryFn: usersApi.findAll });
   const { data: invitaciones } = useQuery({ queryKey: ['invitations'], queryFn: invitationsApi.findAll });
@@ -35,6 +36,13 @@ export default function AdminPage() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['users'] }),
   });
 
+  const generarReset = useMutation({
+    mutationFn: (id: string) => usersApi.createPasswordResetToken(id),
+    onSuccess: (res) => {
+      setResetToken(res.token);
+    },
+  });
+
   return (
     <div className="flex flex-col gap-10">
       <h1 className="text-2xl font-bold text-gray-800">Panel de administración</h1>
@@ -56,6 +64,18 @@ export default function AdminPage() {
             <p className="text-sm text-indigo-600 break-all">{urlInvitacion}</p>
             <button
               onClick={() => navigator.clipboard.writeText(urlInvitacion)}
+              className="text-xs text-indigo-500 hover:underline mt-1"
+            >
+              Copiar al portapapeles
+            </button>
+          </div>
+        )}
+        {resetToken && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
+            <p className="text-sm font-medium text-indigo-700 mb-1">Token de reseteo de contraseña:</p>
+            <p className="text-sm text-indigo-600 break-all font-mono">{resetToken}</p>
+            <button
+              onClick={() => navigator.clipboard.writeText(resetToken)}
               className="text-xs text-indigo-500 hover:underline mt-1"
             >
               Copiar al portapapeles
@@ -110,11 +130,20 @@ export default function AdminPage() {
                   <Badge texto={u.isActive ? 'Activo' : 'Inactivo'} variante={u.isActive ? 'green' : 'red'} />
                 </td>
                 <td className="py-2">
-                  {u.id !== adminId && (
-                    u.isActive
-                      ? <button onClick={() => desactivar.mutate(u.id)} className="text-red-500 hover:underline text-xs">Desactivar</button>
-                      : <button onClick={() => activar.mutate(u.id)} className="text-green-600 hover:underline text-xs">Activar</button>
-                  )}
+                  <div className="flex gap-3 items-center">
+                    {u.id !== adminId && (
+                      u.isActive
+                        ? <button onClick={() => desactivar.mutate(u.id)} className="text-red-500 hover:underline text-xs">Desactivar</button>
+                        : <button onClick={() => activar.mutate(u.id)} className="text-green-600 hover:underline text-xs">Activar</button>
+                    )}
+                    <button
+                      onClick={() => generarReset.mutate(u.id)}
+                      className="text-indigo-600 hover:underline text-xs"
+                      disabled={generarReset.isPending}
+                    >
+                      {generarReset.isPending && generarReset.variables === u.id ? 'Generando...' : 'Resetear contraseña'}
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

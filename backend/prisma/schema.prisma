@@ -35,8 +35,9 @@ model User {
   updatedAt    DateTime @updatedAt
 
   lists         List[]
-  refreshTokens RefreshToken[]
-  invitations   Invitation[]
+  refreshTokens       RefreshToken[]
+  invitations         Invitation[]
+  passwordResetTokens PasswordResetToken[]
 
   @@map("users")
 }
@@ -100,4 +101,18 @@ model Item {
 
   @@index([listId])
   @@map("items")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  token     String   @unique @default(uuid())
+  used      Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@map("password_reset_tokens")
 }

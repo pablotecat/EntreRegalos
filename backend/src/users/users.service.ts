@@ -25,4 +25,9 @@ export class UsersService {
   update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
     return this.usersRepository.update(id, data);
   }
+
+  createPasswordResetToken(userId: string) {
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
+    return this.usersRepository.createPasswordResetToken(userId, expiresAt);
+  }
 }

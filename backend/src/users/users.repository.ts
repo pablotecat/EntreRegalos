@@ -7,7 +7,11 @@ export class UsersRepository {
   constructor(private readonly prisma: PrismaService) {}
 
   findByUsername(username: string): Promise<User | null> {
-    return this.prisma.user.findUnique({ where: { username } });
+    return this.prisma.user.findFirst({
+      where: {
+        username: { equals: username, mode: 'insensitive' },
+      },
+    });
   }
 
   findById(id: string): Promise<User | null> {
@@ -24,5 +28,14 @@ export class UsersRepository {
 
   update(id: string, data: Prisma.UserUpdateInput): Promise<User> {
     return this.prisma.user.update({ where: { id }, data });
+  }
+
+  createPasswordResetToken(userId: string, expiresAt: Date): Promise<{
+    token: string;
+  }> {
+    return this.prisma.passwordResetToken.create({
+      data: { userId, expiresAt },
+      select: { token: true },
+    });
   }
 }

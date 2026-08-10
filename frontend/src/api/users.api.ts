@@ -5,4 +5,5 @@ export const usersApi = {
   findAll: () => api.get<User[]>('/users'),
   deactivate: (id: string) => api.patch<User>(`/users/${id}/deactivate`),
   activate: (id: string) => api.patch<User>(`/users/${id}/activate`),
+  createPasswordResetToken: (id: string) => api.post<{ token: string }>(`/users/${id}/reset-password`),
 };

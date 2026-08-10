@@ -7,8 +7,8 @@ export class RegisterDto {
   @IsString()
   @MinLength(3, { message: 'El nombre de usuario debe tener al menos 3 caracteres' })
   @MaxLength(30, { message: 'El nombre de usuario no puede superar los 30 caracteres' })
-  @Matches(/^[a-z0-9_]+$/, {
-    message: 'El nombre de usuario solo puede contener letras minúsculas, números y guiones bajos',
+  @Matches(/^[a-zA-Z0-9_]+$/, {
+    message: 'El nombre de usuario solo puede contener letras, números y guiones bajos',
   })
   username!: string;
 

@@ -5,6 +5,7 @@ import {
   NotFoundException,
   Param,
   Patch,
+  Post,
 } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -42,5 +43,13 @@ export class UsersController {
     const updated = await this.usersService.update(id, { isActive: true });
     const { passwordHash: _, ...result } = updated;
     return result;
+  }
+
+  @Post(':id/reset-password')
+  async createPasswordResetToken(@Param('id') id: string) {
+    const user = await this.usersService.findById(id);
+    if (!user) throw new NotFoundException('Usuario no encontrado');
+    const token = await this.usersService.createPasswordResetToken(id);
+    return token;
   }
 }
