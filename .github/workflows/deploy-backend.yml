@@ -40,10 +40,9 @@ jobs:
           server: ${{ secrets.FTP_SERVER }}
           username: ${{ secrets.FTP_USERNAME }}
           password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          port: 21
           local-dir: ./backend/
           server-dir: /httpdocs/
+          dangerous-clean-slate: true
           exclude: |
             **/.git*
             **/.git*/**
