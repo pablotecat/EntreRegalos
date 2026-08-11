@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 // Punto de entrada para Phusion Passenger en HelioHost Tommy.
-// Passenger detecta este archivo en la raíz del dominio y lo ejecuta.
+// Passenger detecta este archivo por convención (app.js) en la raíz del dominio.
 
 // Asegurar que los módulos compilados y node_modules se resuelvan correctamente.
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';

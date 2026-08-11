@@ -1,5 +1,3 @@
-# Configuración para Phusion Passenger en HelioHost Tommy
+# Activar Phusion Passenger para esta carpeta.
+# Passenger detecta automáticamente app.js como punto de entrada.
 PassengerEnabled on
-PassengerAppType node
-PassengerStartupFile passenger.js
-PassengerNodejs nodejs
