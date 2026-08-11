@@ -1,3 +1,0 @@
-# Activar Phusion Passenger para esta carpeta.
-# Passenger detecta automáticamente app.js como punto de entrada.
-PassengerEnabled on
