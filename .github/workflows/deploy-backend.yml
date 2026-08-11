@@ -43,7 +43,7 @@ jobs:
           protocol: ftps
           port: 21
           local-dir: ./backend/
-          server-dir: /httpdocs/
+          server-dir: /httpdocs/test-deploy/
           exclude: |
             **/.git*
             **/.git*/**
