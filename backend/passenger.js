@@ -2,10 +2,9 @@
 // Punto de entrada para Phusion Passenger en HelioHost Tommy.
 // Passenger detecta este archivo en la raíz del dominio y lo ejecuta.
 
-const path = require('path');
-
 // Asegurar que los módulos compilados y node_modules se resuelvan correctamente.
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
+process.env.PASSENGER = 'true';
 
 const { createApp } = require('./dist/main');
 
