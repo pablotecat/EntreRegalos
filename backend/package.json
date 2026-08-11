@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "prepare": "husky",
-    "seed": "ts-node prisma/seed.ts"
+    "seed": "ts-node prisma/seed.ts",
+    "migrate": "node_modules/.bin/prisma migrate deploy"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",
