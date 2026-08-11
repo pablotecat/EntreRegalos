@@ -1,0 +1,5 @@
+# Configuración para Phusion Passenger en HelioHost Tommy
+PassengerEnabled on
+PassengerAppType node
+PassengerStartupFile passenger.js
+PassengerNodejs nodejs

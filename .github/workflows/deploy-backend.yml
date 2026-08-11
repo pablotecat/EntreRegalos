@@ -48,8 +48,8 @@ jobs:
           exclude: |
             **/.git*
             **/.git*/**
-            **/node_modules/**
             **/src/**
             **/*.test.ts
             **/*.spec.ts
             .env*
+            .env.example

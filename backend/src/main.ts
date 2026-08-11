@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import * as cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 
-async function bootstrap() {
+export async function createApp() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
@@ -29,9 +29,18 @@ async function bootstrap() {
     credentials: true,
   });
 
+  return { app, configService };
+}
+
+async function bootstrap() {
+  const { app, configService } = await createApp();
   const port = configService.get<number>('PORT') ?? 3001;
   await app.listen(port);
   console.log(`🚀 Backend arrancado en http://localhost:${port}/api/v1`);
 }
 
-bootstrap();
+// En HelioHost con Passenger no arrancamos el servidor aquí;
+// passenger.js importa createApp() y lo hace desde la raíz.
+if (process.env.PASSENGER !== 'true') {
+  bootstrap();
+}
