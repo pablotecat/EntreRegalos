@@ -1,6 +1,9 @@
 name: Deploy Backend a HelioHost
 
+
+
 on:
+  workflow_dispatch: {}
   push:
     branches:
       - main
