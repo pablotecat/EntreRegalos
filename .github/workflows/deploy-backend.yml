@@ -1,7 +1,5 @@
 name: Deploy Backend a HelioHost
 
-
-
 on:
   workflow_dispatch: {}
   push:
@@ -46,7 +44,7 @@ jobs:
           protocol: ftp
           port: 21
           local-dir: ./backend/
-          server-dir: /httpdocs/test-deploy/
+          server-dir: /httpdocs/
           exclude: |
             **/.git*
             **/.git*/**
