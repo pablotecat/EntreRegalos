@@ -29,6 +29,9 @@ export async function createApp() {
     credentials: true,
   });
 
+  // El servido de estáticos y el fallback SPA los gestiona ServeStaticModule
+  // en AppModule (se registran después de las rutas de la API).
+
   return { app, configService };
 }
 

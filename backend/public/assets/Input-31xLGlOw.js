@@ -1,0 +1,2 @@
+import{r as n,j as e}from"./index-BAmGZXTy.js";const o=n.forwardRef(({label:t,error:s,className:a="",...r},x)=>e.jsxs("div",{className:"flex flex-col gap-1",children:[e.jsx("label",{className:"text-sm font-medium text-gray-700",children:t}),e.jsx("input",{ref:x,...r,className:`border rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-indigo-500
+          ${s?"border-red-500":"border-gray-300"} ${a}`}),s&&e.jsx("p",{className:"text-xs text-red-600",children:s})]}));o.displayName="Input";export{o as I};

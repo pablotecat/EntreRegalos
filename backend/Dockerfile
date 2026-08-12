@@ -23,13 +23,12 @@ WORKDIR /app
 COPY package*.json ./
 COPY prisma ./prisma/
 COPY tsconfig.json ./
-COPY src ./src/
 
 RUN npm ci
 
 RUN apk add --no-cache openssl
 
-COPY --from=builder /app/dist/src ./dist
+COPY --from=builder /app/dist ./dist
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 
 EXPOSE 3001
