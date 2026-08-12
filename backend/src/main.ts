@@ -43,7 +43,7 @@ async function bootstrap() {
 }
 
 // En HelioHost con Passenger no arrancamos el servidor aquí;
-// passenger.js importa createApp() y lo hace desde la raíz.
+// app.js importa createApp() y lo hace desde la raíz.
 if (process.env.PASSENGER !== 'true') {
   bootstrap();
 }
