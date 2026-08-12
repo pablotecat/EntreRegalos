@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { Test, TestingModule } from '@nestjs/testing';
-import { ConflictException, GoneException, NotFoundException, UnauthorizedException } from '@nestjs/common';
+import {
+  ConflictException,
+  GoneException,
+  NotFoundException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcrypt';
@@ -42,7 +47,11 @@ const mockRefreshToken = {
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersService: { findByUsername: ReturnType<typeof vi.fn>; findById: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
+  let usersService: {
+    findByUsername: ReturnType<typeof vi.fn>;
+    findById: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+  };
   let jwtService: { sign: ReturnType<typeof vi.fn> };
   let prisma: {
     refreshToken: {
@@ -109,22 +118,25 @@ describe('AuthService', () => {
       usersService.findByUsername.mockResolvedValue(mockUser);
       vi.mocked(bcrypt.compare).mockResolvedValue(false as never);
 
-      await expect(service.login({ username: 'pablo', password: 'incorrecta' }))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.login({ username: 'pablo', password: 'incorrecta' })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('lanza UnauthorizedException si el usuario está desactivado', async () => {
       usersService.findByUsername.mockResolvedValue({ ...mockUser, isActive: false });
 
-      await expect(service.login({ username: 'pablo', password: '12345678' }))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.login({ username: 'pablo', password: '12345678' })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
 
     it('lanza UnauthorizedException si el usuario no existe', async () => {
       usersService.findByUsername.mockResolvedValue(null);
 
-      await expect(service.login({ username: 'noexiste', password: '12345678' }))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.login({ username: 'noexiste', password: '12345678' })).rejects.toThrow(
+        UnauthorizedException,
+      );
     });
   });
 
@@ -139,8 +151,7 @@ describe('AuthService', () => {
     it('lanza UnauthorizedException si el token está revocado', async () => {
       prisma.refreshToken.findUnique.mockResolvedValue({ ...mockRefreshToken, revoked: true });
 
-      await expect(service.refresh('token-revocado'))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.refresh('token-revocado')).rejects.toThrow(UnauthorizedException);
     });
 
     it('lanza UnauthorizedException si el token ha expirado', async () => {
@@ -149,15 +160,13 @@ describe('AuthService', () => {
         expiresAt: new Date(Date.now() - 1000),
       });
 
-      await expect(service.refresh('token-expirado'))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.refresh('token-expirado')).rejects.toThrow(UnauthorizedException);
     });
 
     it('lanza UnauthorizedException si el token no existe', async () => {
       prisma.refreshToken.findUnique.mockResolvedValue(null);
 
-      await expect(service.refresh('token-inexistente'))
-        .rejects.toThrow(UnauthorizedException);
+      await expect(service.refresh('token-inexistente')).rejects.toThrow(UnauthorizedException);
     });
   });
 
@@ -211,7 +220,11 @@ describe('AuthService', () => {
       prisma.invitation.findUnique.mockResolvedValue(null);
 
       await expect(
-        service.register({ invitationToken: 'inexistente', username: 'nuevo', password: '12345678' }),
+        service.register({
+          invitationToken: 'inexistente',
+          username: 'nuevo',
+          password: '12345678',
+        }),
       ).rejects.toThrow(NotFoundException);
     });
 
@@ -220,7 +233,11 @@ describe('AuthService', () => {
       usersService.findByUsername.mockResolvedValue(mockUser);
 
       await expect(
-        service.register({ invitationToken: 'token-valido', username: 'pablo', password: '12345678' }),
+        service.register({
+          invitationToken: 'token-valido',
+          username: 'pablo',
+          password: '12345678',
+        }),
       ).rejects.toThrow(ConflictException);
     });
   });

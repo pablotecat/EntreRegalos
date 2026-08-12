@@ -1,7 +1,4 @@
-import {
-  Body, Controller, Delete, HttpCode, HttpStatus,
-  Param, Patch, Post,
-} from '@nestjs/common';
+import { Body, Controller, Delete, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
 import { User } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { CreateItemDto } from './dto/create-item.dto';
@@ -14,11 +11,7 @@ export class ItemsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
-  create(
-    @Param('listId') listId: string,
-    @Body() dto: CreateItemDto,
-    @CurrentUser() user: User,
-  ) {
+  create(@Param('listId') listId: string, @Body() dto: CreateItemDto, @CurrentUser() user: User) {
     return this.itemsService.create(listId, dto, user.id);
   }
 

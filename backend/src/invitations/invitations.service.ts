@@ -11,7 +11,10 @@ export class InvitationsService {
     private readonly configService: ConfigService,
   ) {}
 
-  async create(dto: CreateInvitationDto, createdById: string): Promise<Invitation & { invitationUrl: string }> {
+  async create(
+    dto: CreateInvitationDto,
+    createdById: string,
+  ): Promise<Invitation & { invitationUrl: string }> {
     const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
     const invitation = await this.invitationsRepository.create({
       reference: dto.reference,

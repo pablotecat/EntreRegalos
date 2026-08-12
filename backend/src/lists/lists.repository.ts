@@ -17,7 +17,10 @@ export class ListsRepository {
   findPublic(excludeOwnerId: string) {
     return this.prisma.list.findMany({
       where: { visibility: Visibility.PUBLIC, ownerId: { not: excludeOwnerId } },
-      include: { owner: { select: { id: true, username: true } }, _count: { select: { items: true } } },
+      include: {
+        owner: { select: { id: true, username: true } },
+        _count: { select: { items: true } },
+      },
       orderBy: { createdAt: 'desc' },
     });
   }
@@ -25,7 +28,10 @@ export class ListsRepository {
   findById(id: string) {
     return this.prisma.list.findUnique({
       where: { id },
-      include: { items: { orderBy: { order: 'asc' } }, owner: { select: { id: true, username: true } } },
+      include: {
+        items: { orderBy: { order: 'asc' } },
+        owner: { select: { id: true, username: true } },
+      },
     });
   }
 

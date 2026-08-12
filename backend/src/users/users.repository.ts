@@ -30,7 +30,10 @@ export class UsersRepository {
     return this.prisma.user.update({ where: { id }, data });
   }
 
-  createPasswordResetToken(userId: string, expiresAt: Date): Promise<{
+  createPasswordResetToken(
+    userId: string,
+    expiresAt: Date,
+  ): Promise<{
     token: string;
   }> {
     return this.prisma.passwordResetToken.create({
