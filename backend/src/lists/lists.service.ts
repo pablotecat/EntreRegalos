@@ -16,6 +16,10 @@ export class ListsService {
     return this.listsRepository.findPublic(userId);
   }
 
+  findByUser(userId: string) {
+    return this.listsRepository.findByUser(userId);
+  }
+
   async findById(id: string, userId: string) {
     const list = await this.listsRepository.findById(id);
     if (!list) throw new NotFoundException('Lista no encontrada');

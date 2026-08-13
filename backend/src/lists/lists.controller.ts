@@ -29,6 +29,11 @@ export class ListsController {
     return this.listsService.findPublic(user.id);
   }
 
+  @Get('user/:userId')
+  findByUser(@Param('userId') userId: string) {
+    return this.listsService.findByUser(userId);
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string, @CurrentUser() user: User) {
     return this.listsService.findById(id, user.id);

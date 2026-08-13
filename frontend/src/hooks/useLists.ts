@@ -9,6 +9,14 @@ export function usePublicLists() {
   return useQuery({ queryKey: ['lists', 'public'], queryFn: listsApi.findPublic });
 }
 
+export function useUserLists(userId: string) {
+  return useQuery({
+    queryKey: ['lists', 'user', userId],
+    queryFn: () => listsApi.findByUser(userId),
+    enabled: !!userId,
+  });
+}
+
 export function useList(id: string) {
   return useQuery({ queryKey: ['lists', id], queryFn: () => listsApi.findById(id) });
 }

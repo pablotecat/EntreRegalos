@@ -1,6 +1,7 @@
 import { useState, FormEvent } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useList, useCreateItem, useDeleteItem } from '../../hooks/useLists';
+import { useMe } from '../../hooks/useAuth';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { Badge } from '../../components/ui/Badge';
@@ -8,17 +9,23 @@ import { Badge } from '../../components/ui/Badge';
 export default function ListDetailPage() {
   const { id = '' } = useParams<{ id: string }>();
   const { data: lista, isLoading } = useList(id);
+  const { data: yo } = useMe();
   const crearItem = useCreateItem(id);
   const borrarItem = useDeleteItem(id);
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
   const [nombre, setNombre] = useState('');
   const [descripcion, setDescripcion] = useState('');
+
+  const esPropietario = lista?.ownerId === yo?.id;
+  const volverA = esPropietario ? '/listas' : '/amigos';
+  const textoVolver = esPropietario ? '← Mis listas' : '← Amigos';
 
   const handleAddItem = (e: FormEvent) => {
     e.preventDefault();
     if (!nombre.trim()) return;
     crearItem.mutate(
       { name: nombre.trim(), description: descripcion.trim() || undefined },
-      { onSuccess: () => { setNombre(''); setDescripcion(''); } },
+      { onSuccess: () => { setNombre(''); setDescripcion(''); setMostrarFormulario(false); } },
     );
   };
 
@@ -28,7 +35,7 @@ export default function ListDetailPage() {
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-2">
-        <Link to="/listas" className="text-sm text-gray-400 hover:text-gray-600">← Mis listas</Link>
+        <Link to={volverA} className="text-sm text-gray-400 hover:text-gray-600">{textoVolver}</Link>
       </div>
       <div className="flex items-center gap-3 mb-6">
         <h1 className="text-2xl font-bold text-gray-800">{lista.name}</h1>
@@ -38,13 +45,25 @@ export default function ListDetailPage() {
         />
       </div>
 
-      {/* Formulario añadir ítem */}
-      <form onSubmit={handleAddItem} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-6 flex flex-col gap-3">
-        <h2 className="font-semibold text-gray-700">Añadir artículo</h2>
-        <Input label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Auriculares inalámbricos" />
-        <Input label="Descripción (opcional)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Enlace, color, talla..." />
-        <Button type="submit" cargando={crearItem.isPending} className="self-end">Añadir</Button>
-      </form>
+      {/* Botón añadir ítem (solo propietario) */}
+      {esPropietario && !mostrarFormulario && (
+        <Button onClick={() => setMostrarFormulario(true)} className="mb-6">
+          Añadir artículo
+        </Button>
+      )}
+
+      {/* Formulario añadir ítem (solo propietario) */}
+      {esPropietario && mostrarFormulario && (
+        <form onSubmit={handleAddItem} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 mb-6 flex flex-col gap-3">
+          <h2 className="font-semibold text-gray-700">Añadir artículo</h2>
+          <Input label="Nombre" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Auriculares inalámbricos" />
+          <Input label="Descripción (opcional)" value={descripcion} onChange={(e) => setDescripcion(e.target.value)} placeholder="Enlace, color, talla..." />
+          <div className="flex justify-end gap-2">
+            <Button type="button" variante="secondary" onClick={() => setMostrarFormulario(false)}>Cancelar</Button>
+            <Button type="submit" cargando={crearItem.isPending}>Añadir</Button>
+          </div>
+        </form>
+      )}
 
       {/* Lista de ítems */}
       <ul className="flex flex-col gap-3">
@@ -57,12 +76,14 @@ export default function ListDetailPage() {
               <p className="font-medium text-gray-800">{item.name}</p>
               {item.description && <p className="text-sm text-gray-500 mt-1">{item.description}</p>}
             </div>
-            <button
-              onClick={() => { if (confirm('¿Borrar este artículo?')) borrarItem.mutate(item.id); }}
-              className="text-red-400 hover:text-red-600 text-sm shrink-0"
-            >
-              Borrar
-            </button>
+            {esPropietario && (
+              <button
+                onClick={() => { if (confirm('¿Borrar este artículo?')) borrarItem.mutate(item.id); }}
+                className="text-red-400 hover:text-red-600 text-sm shrink-0"
+              >
+                Borrar
+              </button>
+            )}
           </li>
         ))}
       </ul>

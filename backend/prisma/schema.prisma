@@ -36,8 +36,11 @@ model User {
 
   lists         List[]
   refreshTokens       RefreshToken[]
-  invitations         Invitation[]
+  createdInvitations  Invitation[] @relation("createdInvitations")
   passwordResetTokens PasswordResetToken[]
+
+  invitationTokenId String?     @unique
+  invitationToken   Invitation? @relation("registeredInvitation", fields: [invitationTokenId], references: [id])
 
   @@map("users")
 }
@@ -51,7 +54,9 @@ model Invitation {
   createdAt   DateTime @default(now())
 
   createdById String
-  createdBy   User     @relation(fields: [createdById], references: [id])
+  createdBy   User     @relation("createdInvitations", fields: [createdById], references: [id])
+
+  registeredUser User? @relation("registeredInvitation")
 
   @@index([token])
   @@map("invitations")

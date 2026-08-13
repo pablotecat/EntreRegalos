@@ -25,8 +25,10 @@ export class InvitationsService {
     return { ...invitation, invitationUrl: `${frontendUrl}/register?token=${invitation.token}` };
   }
 
-  findAll(): Promise<Invitation[]> {
-    return this.invitationsRepository.findAll();
+  findAll(): Promise<(Invitation & { invitationUrl: string })[]> {
+    return this.invitationsRepository.findAll(
+      this.configService.get<string>('FRONTEND_URL') ?? 'http://localhost:3000',
+    );
   }
 
   async validate(token: string): Promise<{ valid: true }> {

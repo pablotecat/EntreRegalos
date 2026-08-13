@@ -13,6 +13,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { UsersService } from '../users/users.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Injectable()
 export class AuthService {
@@ -51,6 +52,7 @@ export class AuthService {
     const usuario = await this.usersService.create({
       username: dto.username,
       passwordHash: hash,
+      invitationToken: { connect: { id: invitacion.id } },
     });
 
     await this.prisma.invitation.update({
@@ -79,6 +81,33 @@ export class AuthService {
     await this.prisma.refreshToken.updateMany({
       where: { token: refreshToken },
       data: { revoked: true },
+    });
+  }
+
+  async validateResetToken(token: string): Promise<{ valid: true; username: string }> {
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { token },
+      include: { user: true },
+    });
+    if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
+      throw new GoneException('El enlace de reseteo ha expirado o ya ha sido utilizado');
+    }
+    return { valid: true, username: resetToken.user.username };
+  }
+
+  async resetPassword(dto: ResetPasswordDto): Promise<void> {
+    const resetToken = await this.prisma.passwordResetToken.findUnique({
+      where: { token: dto.token },
+    });
+    if (!resetToken || resetToken.used || resetToken.expiresAt < new Date()) {
+      throw new GoneException('El enlace de reseteo ha expirado o ya ha sido utilizado');
+    }
+
+    const hash = await bcrypt.hash(dto.password, 10);
+    await this.usersService.update(resetToken.userId, { passwordHash: hash });
+    await this.prisma.passwordResetToken.update({
+      where: { id: resetToken.id },
+      data: { used: true },
     });
   }
 

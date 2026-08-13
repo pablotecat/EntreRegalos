@@ -9,6 +9,7 @@ export interface UpdateItemPayload { name?: string; description?: string; }
 export const listsApi = {
   findMine: () => api.get<List[]>('/lists'),
   findPublic: () => api.get<List[]>('/lists/public'),
+  findByUser: (userId: string) => api.get<List[]>(`/lists/user/${userId}`),
   findById: (id: string) => api.get<List>(`/lists/${id}`),
   create: (data: CreateListPayload) => api.post<List>('/lists', data),
   update: (id: string, data: UpdateListPayload) => api.patch<List>(`/lists/${id}`, data),

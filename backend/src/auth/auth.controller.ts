@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Query,
   Req,
   Res,
   UnauthorizedException,
@@ -16,6 +17,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { AuthService } from './auth.service';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -46,6 +48,20 @@ export class AuthController {
     const refreshToken = req.cookies?.refreshToken as string | undefined;
     if (!refreshToken) throw new UnauthorizedException('Refresh token no encontrado');
     return this.authService.refresh(refreshToken);
+  }
+
+  @Public()
+  @Get('reset-password/validate')
+  async validateResetToken(@Query('token') token: string) {
+    return this.authService.validateResetToken(token);
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto);
+    return { message: 'Contraseña actualizada correctamente' };
   }
 
   @Post('logout')

@@ -9,8 +9,10 @@ const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const RegisterPage = lazy(() => import('./pages/auth/RegisterPage'));
 const ListsPage = lazy(() => import('./pages/lists/ListsPage'));
 const ListDetailPage = lazy(() => import('./pages/lists/ListDetailPage'));
-const DiscoverPage = lazy(() => import('./pages/lists/DiscoverPage'));
+const AmigosPage = lazy(() => import('./pages/lists/AmigosPage'));
+const UserListsPage = lazy(() => import('./pages/lists/UserListsPage'));
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'));
+const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'));
 
 function Cargando() {
   return <div className="flex justify-center mt-20 text-gray-400">Cargando...</div>;
@@ -24,6 +26,7 @@ export default function App() {
         <Route element={<AuthLayout />}>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/reset-password" element={<ResetPasswordPage />} />
         </Route>
 
         {/* Rutas protegidas */}
@@ -31,7 +34,8 @@ export default function App() {
           <Route element={<AppLayout />}>
             <Route path="/listas" element={<ListsPage />} />
             <Route path="/listas/:id" element={<ListDetailPage />} />
-            <Route path="/descubrir" element={<DiscoverPage />} />
+            <Route path="/amigos" element={<AmigosPage />} />
+            <Route path="/amigos/:userId/listas" element={<UserListsPage />} />
 
             {/* Solo admin */}
             <Route element={<RequireAdmin />}>

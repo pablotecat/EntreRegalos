@@ -12,10 +12,11 @@ export default function AdminPage() {
   const qc = useQueryClient();
   const [referencia, setReferencia] = useState('');
   const [urlInvitacion, setUrlInvitacion] = useState('');
-  const [resetToken, setResetToken] = useState<string | null>(null);
+  const [resetToken, setResetToken] = useState<{ token: string; resetUrl: string } | null>(null);
 
   const { data: usuarios } = useQuery({ queryKey: ['users'], queryFn: usersApi.findAll });
   const { data: invitaciones } = useQuery({ queryKey: ['invitations'], queryFn: invitationsApi.findAll });
+  const { data: resetTokens } = useQuery({ queryKey: ['password-reset-tokens'], queryFn: usersApi.findPasswordResetTokens });
 
   const crearInvitacion = useMutation({
     mutationFn: () => invitationsApi.create({ reference: referencia || undefined }),
@@ -39,7 +40,8 @@ export default function AdminPage() {
   const generarReset = useMutation({
     mutationFn: (id: string) => usersApi.createPasswordResetToken(id),
     onSuccess: (res) => {
-      setResetToken(res.token);
+      setResetToken(res);
+      qc.invalidateQueries({ queryKey: ['password-reset-tokens'] });
     },
   });
 
@@ -70,24 +72,13 @@ export default function AdminPage() {
             </button>
           </div>
         )}
-        {resetToken && (
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-            <p className="text-sm font-medium text-indigo-700 mb-1">Token de reseteo de contraseña:</p>
-            <p className="text-sm text-indigo-600 break-all font-mono">{resetToken}</p>
-            <button
-              onClick={() => navigator.clipboard.writeText(resetToken)}
-              className="text-xs text-indigo-500 hover:underline mt-1"
-            >
-              Copiar al portapapeles
-            </button>
-          </div>
-        )}
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="text-left text-gray-500 border-b border-gray-200">
               <th className="py-2 pr-4">Referencia</th>
               <th className="py-2 pr-4">Estado</th>
               <th className="py-2 pr-4">Expira</th>
+              <th className="py-2">Enlace</th>
             </tr>
           </thead>
           <tbody>
@@ -101,6 +92,58 @@ export default function AdminPage() {
                   />
                 </td>
                 <td className="py-2 pr-4 text-gray-500">{new Date(inv.expiresAt).toLocaleDateString('es-ES')}</td>
+                <td className="py-2">
+                  {!inv.used && new Date(inv.expiresAt) >= new Date() && inv.invitationUrl && (
+                    <button
+                      onClick={() => navigator.clipboard.writeText(inv.invitationUrl!)}
+                      className="text-xs text-indigo-500 hover:underline"
+                    >
+                      Copiar enlace
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
+
+      {/* Tokens de reseteo */}
+      <section>
+        <h2 className="text-lg font-semibold text-gray-700 mb-4">Tokens de reseteo de contraseña</h2>
+        {resetToken && (
+          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
+            <p className="text-sm font-medium text-indigo-700 mb-1">Enlace de reseteo de contraseña generado:</p>
+            <p className="text-sm text-indigo-600 break-all">{resetToken.resetUrl}</p>
+            <button
+              onClick={() => navigator.clipboard.writeText(resetToken.resetUrl)}
+              className="text-xs text-indigo-500 hover:underline mt-1"
+            >
+              Copiar al portapapeles
+            </button>
+          </div>
+        )}
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="text-left text-gray-500 border-b border-gray-200">
+              <th className="py-2 pr-4">Usuario</th>
+              <th className="py-2 pr-4">Expira</th>
+              <th className="py-2">Enlace</th>
+            </tr>
+          </thead>
+          <tbody>
+            {resetTokens?.map((t) => (
+              <tr key={t.id} className="border-b border-gray-100">
+                <td className="py-2 pr-4 font-medium text-gray-800">@{t.user.username}</td>
+                <td className="py-2 pr-4 text-gray-500">{new Date(t.expiresAt).toLocaleDateString('es-ES')}</td>
+                <td className="py-2">
+                  <button
+                    onClick={() => navigator.clipboard.writeText(t.resetUrl)}
+                    className="text-xs text-indigo-500 hover:underline"
+                  >
+                    Copiar enlace
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>

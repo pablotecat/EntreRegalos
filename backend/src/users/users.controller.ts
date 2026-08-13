@@ -13,17 +13,23 @@ import { Roles } from '../common/decorators/roles.decorator';
 import { UsersService } from './users.service';
 import { User } from '@prisma/client';
 
-@Roles(Role.ADMIN)
 @Controller('users')
 export class UsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
-  async findAll() {
-    const users = await this.usersService.findAll();
+  async findAll(@CurrentUser() user: User) {
+    const users = await this.usersService.findAllActiveExcept(user.id);
     return users.map(({ passwordHash: _, ...u }) => u);
   }
 
+  @Roles(Role.ADMIN)
+  @Get('password-reset-tokens')
+  async findPasswordResetTokens() {
+    return this.usersService.findActivePasswordResetTokens();
+  }
+
+  @Roles(Role.ADMIN)
   @Patch(':id/deactivate')
   async deactivate(@Param('id') id: string, @CurrentUser() admin: User) {
     if (id === admin.id) {
@@ -36,6 +42,7 @@ export class UsersController {
     return result;
   }
 
+  @Roles(Role.ADMIN)
   @Patch(':id/activate')
   async activate(@Param('id') id: string) {
     const user = await this.usersService.findById(id);
@@ -45,6 +52,7 @@ export class UsersController {
     return result;
   }
 
+  @Roles(Role.ADMIN)
   @Post(':id/reset-password')
   async createPasswordResetToken(@Param('id') id: string) {
     const user = await this.usersService.findById(id);

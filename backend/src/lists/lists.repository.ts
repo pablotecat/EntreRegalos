@@ -25,6 +25,20 @@ export class ListsRepository {
     });
   }
 
+  findByUser(userId: string) {
+    return this.prisma.list.findMany({
+      where: {
+        ownerId: userId,
+        visibility: Visibility.PUBLIC,
+      },
+      include: {
+        owner: { select: { id: true, username: true } },
+        _count: { select: { items: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
   findById(id: string) {
     return this.prisma.list.findUnique({
       where: { id },

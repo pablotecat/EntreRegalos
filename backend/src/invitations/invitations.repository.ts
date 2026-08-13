@@ -10,8 +10,17 @@ export class InvitationsRepository {
     return this.prisma.invitation.create({ data });
   }
 
-  findAll(): Promise<Invitation[]> {
-    return this.prisma.invitation.findMany({ orderBy: { createdAt: 'desc' } });
+  findAll(frontendUrl: string): Promise<(Invitation & { invitationUrl: string })[]> {
+    return this.prisma.invitation
+      .findMany({
+        orderBy: { createdAt: 'desc' },
+      })
+      .then((invitations) =>
+        invitations.map((inv) => ({
+          ...inv,
+          invitationUrl: `${frontendUrl}/register?token=${inv.token}`,
+        })),
+      );
   }
 
   findByToken(token: string): Promise<Invitation | null> {

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { authApi, LoginPayload, RegisterPayload } from '../api/auth.api';
+import { usersApi } from '../api/users.api';
 import { useAuthStore } from '../store/auth.store';
 
 export function useMe() {
@@ -11,6 +12,10 @@ export function useMe() {
     enabled: !!token,
     retry: false,
   });
+}
+
+export function useUsers() {
+  return useQuery({ queryKey: ['users'], queryFn: usersApi.findAll });
 }
 
 export function useLogin() {
