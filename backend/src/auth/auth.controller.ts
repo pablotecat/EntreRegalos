@@ -69,7 +69,8 @@ export class AuthController {
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const refreshToken = req.cookies?.refreshToken as string | undefined;
     if (refreshToken) await this.authService.logout(refreshToken);
-    res.clearCookie('refreshToken');
+    res.clearCookie('refreshToken', { path: '/api/v1/auth' });
+    res.clearCookie('refreshToken', { path: '/api/v1/auth/refresh' });
     return { message: 'Sesión cerrada correctamente' };
   }
 
@@ -80,11 +81,13 @@ export class AuthController {
   }
 
   private setCookieRefresh(res: Response, refreshToken: string): void {
+    // Remove the legacy cookie so it cannot shadow the new one on refresh.
+    res.clearCookie('refreshToken', { path: '/api/v1/auth/refresh' });
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env['NODE_ENV'] === 'production',
       sameSite: 'strict',
-      path: '/api/v1/auth/refresh',
+      path: '/api/v1/auth',
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
   }
