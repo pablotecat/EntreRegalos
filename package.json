@@ -1,4 +1,11 @@
 {
+  "scripts": {
+    "test:playwright": "playwright test",
+    "test:api": "playwright test --project=api",
+    "test:ui": "playwright test --project=ui",
+    "test:e2e": "playwright test --project=e2e --project=e2e-mobile",
+    "test:types": "node backend/node_modules/typescript/bin/tsc --project tests/tsconfig.json"
+  },
   "dependencies": {
     "@nestjs/jwt": "^11.0.2",
     "@nestjs/passport": "^11.0.5",
@@ -10,6 +17,7 @@
     "passport-jwt": "^4.0.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/bcrypt": "^6.0.0",
     "@types/cookie-parser": "^1.4.10",
     "@types/passport-jwt": "^4.0.1"

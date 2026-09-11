@@ -8,7 +8,7 @@ export default defineConfig({
     proxy: {
       // Redirige todas las peticiones /api al backend
       '/api': {
-        target: 'http://localhost:3001',
+        target: process.env.API_PROXY_TARGET ?? 'http://localhost:3001',
         changeOrigin: true,
       },
     },
