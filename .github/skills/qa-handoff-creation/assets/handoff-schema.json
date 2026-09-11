@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Handoff Schema for QA Agents",
+  "description": "Recibo minimo de validacion por transicion. El contenido de trabajo (requisitos, gaps, decisiones, etc.) vive en el markdown de resumen del agente, no en este JSON.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["handoff"],
+  "properties": {
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "agent",
+        "session_id",
+        "timestamp",
+        "status",
+        "assigned_task",
+        "work_performed",
+        "checks",
+        "counts",
+        "summary_md",
+        "work_log_md"
+      ],
+      "properties": {
+        "agent": {
+          "type": "string",
+          "pattern": "^[A-Za-z][A-Za-z0-9._-]{2,60}$",
+          "description": "Identificador del agente productor tal como aparece en su frontmatter o nombre de skill."
+        },
+        "session_id": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["completed", "blocked", "partial"]
+        },
+        "assigned_task": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["task_id", "scope_received"],
+          "description": "Hechos que el agente reporta sobre el encargo recibido. El agente NUNCA autoevalua su cumplimiento; eso lo decide quien consume el handoff comparando estos campos contra la solicitud original.",
+          "properties": {
+            "task_id": {
+              "type": "string",
+              "description": "Identificador de la instruccion o tarea recibida."
+            },
+            "scope_received": {
+              "type": "string",
+              "description": "Eco textual de lo que el agente entendio que se le pedia."
+            }
+          }
+        },
+        "work_performed": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["sections_touched", "sections_untouched"],
+          "description": "Hechos observables sobre que se modifico realmente, no una narrativa ni un juicio de cumplimiento.",
+          "properties": {
+            "sections_touched": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "sections_untouched": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "checks": {
+          "type": "object",
+          "additionalProperties": { "type": "boolean" }
+        },
+        "counts": {
+          "type": "object",
+          "additionalProperties": { "type": "integer", "minimum": 0 }
+        },
+        "summary_md": {
+          "type": "string",
+          "description": "Ruta al markdown de trabajo completo del agente (fuente de verdad del contenido)."
+        },
+        "work_log_md": {
+          "type": "string",
+          "description": "Ruta al log de ejecucion por paso del agente (auditoria interna, comentarios y bloqueos)."
+        }
+      }
+    }
+  }
+}
