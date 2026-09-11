@@ -1,5 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Test, TestingModule } from '@nestjs/testing';
+import { describe, it, expect, vi, beforeEach, type Mock, type Mocked } from 'vitest';
 import {
   ConflictException,
   GoneException,
@@ -8,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import type { User } from '@prisma/client';
 import * as bcrypt from 'bcrypt';
 import { AuthService } from './auth.service';
 import { UsersService } from '../users/users.service';
@@ -15,12 +15,13 @@ import { PrismaService } from '../prisma/prisma.service';
 
 vi.mock('bcrypt');
 
-const mockUser = {
+const mockUser: User = {
   id: 'user-1',
   username: 'pablo',
   passwordHash: 'hashed',
   role: 'USER',
   isActive: true,
+  invitationTokenId: null,
   createdAt: new Date(),
   updatedAt: new Date(),
 };
@@ -47,71 +48,77 @@ const mockRefreshToken = {
 
 describe('AuthService', () => {
   let service: AuthService;
-  let usersService: {
-    findByUsername: ReturnType<typeof vi.fn>;
-    findById: ReturnType<typeof vi.fn>;
-    create: ReturnType<typeof vi.fn>;
-  };
-  let jwtService: { sign: ReturnType<typeof vi.fn> };
+  let usersService: Mocked<Pick<UsersService, 'findByUsername' | 'create'>>;
+  let jwtService: Mocked<Pick<JwtService, 'sign'>>;
   let prisma: {
     refreshToken: {
-      create: ReturnType<typeof vi.fn>;
-      findUnique: ReturnType<typeof vi.fn>;
-      updateMany: ReturnType<typeof vi.fn>;
+      [K in 'create' | 'findUnique' | 'updateMany']: Mock<
+        Parameters<PrismaService['refreshToken'][K]>,
+        ReturnType<PrismaService['refreshToken'][K]>
+      >;
     };
     invitation: {
-      findUnique: ReturnType<typeof vi.fn>;
-      update: ReturnType<typeof vi.fn>;
+      [K in 'findUnique' | 'update']: Mock<
+        Parameters<PrismaService['invitation'][K]>,
+        ReturnType<PrismaService['invitation'][K]>
+      >;
     };
   };
 
-  beforeEach(async () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
     usersService = {
       findByUsername: vi.fn(),
-      findById: vi.fn(),
       create: vi.fn(),
     };
     jwtService = { sign: vi.fn().mockReturnValue('access-token') };
     prisma = {
       refreshToken: {
-        create: vi.fn().mockResolvedValue({ token: 'refresh-uuid' }),
+        create: vi.fn().mockResolvedValue(mockRefreshToken),
         findUnique: vi.fn(),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       invitation: {
         findUnique: vi.fn(),
-        update: vi.fn().mockResolvedValue({}),
+        update: vi.fn().mockResolvedValue({ ...mockInvitacion, used: true }),
       },
     };
 
-    const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        AuthService,
-        { provide: UsersService, useValue: usersService },
-        { provide: JwtService, useValue: jwtService },
-        { provide: PrismaService, useValue: prisma },
-        {
-          provide: ConfigService,
-          useValue: {
-            getOrThrow: vi.fn().mockReturnValue('test-secret'),
-            get: vi.fn().mockReturnValue('15m'),
-          },
-        },
-      ],
-    }).compile();
+    const configService: Mocked<Pick<ConfigService, 'getOrThrow' | 'get'>> = {
+      getOrThrow: vi.fn().mockReturnValue('test-secret'),
+      get: vi.fn().mockReturnValue('15m'),
+    };
 
-    service = module.get<AuthService>(AuthService);
+    // esbuild does not emit the constructor metadata needed by Nest's test harness.
+    service = new AuthService(
+      usersService as unknown as UsersService,
+      jwtService as unknown as JwtService,
+      configService as unknown as ConfigService,
+      prisma as unknown as PrismaService,
+    );
   });
 
   describe('login', () => {
     it('devuelve tokens cuando las credenciales son correctas', async () => {
       usersService.findByUsername.mockResolvedValue(mockUser);
       vi.mocked(bcrypt.compare).mockResolvedValue(true as never);
-      prisma.refreshToken.create.mockResolvedValue({ token: 'refresh-uuid' });
 
       const result = await service.login({ username: 'pablo', password: '12345678' });
-      expect(result).toHaveProperty('accessToken');
-      expect(result).toHaveProperty('refreshToken');
+      expect(result).toEqual({
+        accessToken: 'access-token',
+        refreshToken: expect.stringMatching(
+          /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i,
+        ),
+      });
+      expect(usersService.findByUsername).toHaveBeenCalledWith('pablo');
+      expect(bcrypt.compare).toHaveBeenCalledWith('12345678', mockUser.passwordHash);
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        { sub: mockUser.id, username: mockUser.username, role: mockUser.role },
+        { secret: 'test-secret', expiresIn: '15m' },
+      );
+      expect(prisma.refreshToken.create).toHaveBeenCalledWith({
+        data: { token: result.refreshToken, userId: mockUser.id, expiresAt: expect.any(Date) },
+      });
     });
 
     it('lanza UnauthorizedException con contraseña incorrecta', async () => {
@@ -145,7 +152,16 @@ describe('AuthService', () => {
       prisma.refreshToken.findUnique.mockResolvedValue(mockRefreshToken);
 
       const result = await service.refresh('refresh-token-valido');
-      expect(result).toHaveProperty('accessToken');
+      expect(result).toEqual({ accessToken: 'access-token' });
+      expect(prisma.refreshToken.findUnique).toHaveBeenCalledWith({
+        where: { token: 'refresh-token-valido' },
+        include: { user: true },
+      });
+      expect(jwtService.sign).toHaveBeenCalledWith(
+        { sub: mockUser.id, username: mockUser.username, role: mockUser.role },
+        { secret: 'test-secret', expiresIn: '15m' },
+      );
+      expect(prisma.refreshToken.create).not.toHaveBeenCalled();
     });
 
     it('lanza UnauthorizedException si el token está revocado', async () => {
@@ -193,8 +209,20 @@ describe('AuthService', () => {
         password: '12345678',
       });
 
-      expect(result).toHaveProperty('accessToken');
-      expect(prisma.invitation.update).toHaveBeenCalled();
+      expect(result).toEqual({ accessToken: 'access-token', refreshToken: expect.any(String) });
+      expect(bcrypt.hash).toHaveBeenCalledWith('12345678', 10);
+      expect(usersService.create).toHaveBeenCalledWith({
+        username: 'nuevo',
+        passwordHash: 'hashed',
+        invitationToken: { connect: { id: mockInvitacion.id } },
+      });
+      expect(prisma.invitation.update).toHaveBeenCalledWith({
+        where: { id: mockInvitacion.id },
+        data: { used: true },
+      });
+      expect(prisma.refreshToken.create).toHaveBeenCalledWith({
+        data: { token: result.refreshToken, userId: mockUser.id, expiresAt: expect.any(Date) },
+      });
     });
 
     it('lanza GoneException si la invitación está usada', async () => {
