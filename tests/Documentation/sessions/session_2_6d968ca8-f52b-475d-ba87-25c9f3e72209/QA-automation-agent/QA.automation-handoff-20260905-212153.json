@@ -1,0 +1,54 @@
+{
+  "handoff": {
+    "agent": "QA.automation",
+    "session_id": "6d968ca8-f52b-475d-ba87-25c9f3e72209",
+    "timestamp": "2026-09-05T19:21:53.581Z",
+    "status": "completed",
+    "assigned_task": {
+      "task_id": "session2-front-ui-automation",
+      "scope_received": "Generar los tests automáticos de UI para front siguiendo la documentación de la session2 y guardarlos en ./front/tests/ en carpetas diferentes para e2e y api."
+    },
+    "work_performed": {
+      "sections_touched": [
+        "Resumen Ejecutivo",
+        "Modo de Entrada",
+        "Especificaciones Creadas o Editadas",
+        "Pasos PROVISIONAL",
+        "POM",
+        "Notas de Cierre para Revisión Humana",
+        "Artefactos Generados",
+        "Checklist de Validación",
+        "Cierre"
+      ],
+      "sections_untouched": []
+    },
+    "checks": {
+      "every_test_case_resolved": true,
+      "every_spec_has_test_id": true,
+      "every_touched_file_timestamped": true,
+      "no_code_in_report": true,
+      "no_wait_for_timeout": true,
+      "locators_stable_or_provisional": true,
+      "deprecated_tests_use_fixme": true,
+      "playwright_best_practices_consulted": true,
+      "full_suite_passed": true
+    },
+    "counts": {
+      "test_cases_total": 45,
+      "tests_created": 45,
+      "tests_edited": 0,
+      "tests_deprecated": 0,
+      "tests_provisional": 1,
+      "pom_edited": 0,
+      "pom_created": 0,
+      "gaps_resolved": 2,
+      "gaps_pending": 2,
+      "spec_files": 11,
+      "e2e_tests": 38,
+      "api_tests": 7,
+      "tests_passed": 45
+    },
+    "summary_md": "tests/Documentation/sessions/session_2_6d968ca8-f52b-475d-ba87-25c9f3e72209/QA-automation-agent/QA.automation-generation-report.md",
+    "work_log_md": "tests/Documentation/sessions/session_2_6d968ca8-f52b-475d-ba87-25c9f3e72209/QA-automation-agent/QA.automation-work-log.md"
+  }
+}

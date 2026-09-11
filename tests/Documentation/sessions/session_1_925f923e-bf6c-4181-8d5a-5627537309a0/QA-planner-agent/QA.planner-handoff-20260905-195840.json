@@ -1,0 +1,39 @@
+{
+  "handoff": {
+    "agent": "QA.planner",
+    "session_id": "925f923e-bf6c-4181-8d5a-5627537309a0",
+    "timestamp": "2026-09-05T19:58:40.7998149+02:00",
+    "status": "completed",
+    "assigned_task": {
+      "task_id": "test-plan-20260905",
+      "scope_received": "haz el test plan de este proyecto. Eliminé el archivo SPEC_Listas_y_amigos.md, son especificaciones para el futuro y no han de tenerse en cuenta ahora."
+    },
+    "work_performed": {
+      "sections_touched": ["Resumen Ejecutivo", "Suites Diseñadas", "Análisis de Cobertura", "Cobertura de Riesgo por Gap", "Decisiones de Diseño y Supuestos", "Precondiciones por Suite", "Notas de Cierre para Revisión Humana", "Artefactos Generados", "Checklist de Validación", "Cierre"],
+      "sections_untouched": []
+    },
+    "checks": {
+      "all_in_scope_requirements_covered": true,
+      "suite_requirement_traceability_bidirectional": true,
+      "scenario_acceptance_traceability_present": true,
+      "withdrawn_specification_requirements_excluded": true,
+      "test_names_contain_no_steps": true,
+      "report_counts_consistent": true,
+      "handoff_schema_valid": true
+    },
+    "counts": {
+      "suites": 7,
+      "scenarios": 51,
+      "requirements_in_scope": 51,
+      "requirements_covered": 51,
+      "requirements_excluded_by_withdrawn_source": 3,
+      "coverage_percentage": 100,
+      "gaps_echoed": 4,
+      "gaps_not_applicable": 2,
+      "gaps_unmitigated": 2,
+      "estimated_total_duration_seconds": 1830
+    },
+    "summary_md": "tests/Documentation/sessions/session_1_925f923e-bf6c-4181-8d5a-5627537309a0/QA-planner-agent/QA.planner-execution-summary.md",
+    "work_log_md": "tests/Documentation/sessions/session_1_925f923e-bf6c-4181-8d5a-5627537309a0/QA-planner-agent/QA.planner-work-log.md"
+  }
+}

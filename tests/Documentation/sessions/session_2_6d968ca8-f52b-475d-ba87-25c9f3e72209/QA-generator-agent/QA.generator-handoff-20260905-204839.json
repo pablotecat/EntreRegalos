@@ -1,0 +1,47 @@
+{
+  "handoff": {
+    "agent": "QA.generator",
+    "session_id": "6d968ca8-f52b-475d-ba87-25c9f3e72209",
+    "timestamp": "2026-09-05T18:48:39.380Z",
+    "status": "completed",
+    "assigned_task": {
+      "task_id": "create-test-cases-session-2",
+      "scope_received": "Crear el test plan del proyecto usando la documentación de la sesión 2, combinando tests cuando sea evidente y evitando una relación 1:1 con los requisitos."
+    },
+    "work_performed": {
+      "sections_touched": [
+        "Resumen Ejecutivo",
+        "Modo de Entrada",
+        "Test Cases",
+        "Pasos PROVISIONAL (recopilación)",
+        "Notas de Cierre para Revisión Humana",
+        "Artefactos Generados",
+        "Checklist de Validación",
+        "Cierre"
+      ],
+      "sections_untouched": []
+    },
+    "checks": {
+      "original_id_preserved": true,
+      "splits_follow_pattern": true,
+      "every_test_has_ac": true,
+      "every_test_has_nuclear_then": true,
+      "every_step_clear_or_provisional": true,
+      "bidirectional_traceability_verified": true,
+      "report_consistent_with_counts": true
+    },
+    "counts": {
+      "test_cases_total": 45,
+      "test_cases_splitted": 0,
+      "steps_provisional_total": 0,
+      "acceptance_criteria_covered": 112,
+      "acceptance_criteria_uncovered": 0,
+      "functional_areas": 7,
+      "source_gaps_preserved": 14,
+      "mode_planning_done": 0,
+      "mode_no_planning": 1
+    },
+    "summary_md": "tests/Documentation/sessions/session_2_6d968ca8-f52b-475d-ba87-25c9f3e72209/QA-generator-agent/QA.generator-test-cases.md",
+    "work_log_md": "tests/Documentation/sessions/session_2_6d968ca8-f52b-475d-ba87-25c9f3e72209/QA-generator-agent/QA.generator-work-log.md"
+  }
+}
