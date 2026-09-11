@@ -15,7 +15,7 @@ export function Button({ variante = 'primary', cargando, children, className = '
   return (
     <button
       {...props}
-      disabled={disabled ?? cargando}
+      disabled={disabled || cargando}
       className={`px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${clases[variante]} ${className}`}
     >
       {cargando ? 'Cargando...' : children}

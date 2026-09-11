@@ -50,7 +50,7 @@ export default function AdminPage() {
       <h1 className="text-2xl font-bold text-gray-800">Panel de administración</h1>
 
       {/* Invitaciones */}
-      <section>
+      <section className="overflow-x-auto">
         <h2 className="text-lg font-semibold text-gray-700 mb-4">Invitaciones</h2>
         <div className="flex gap-3 mb-4">
           <Input label="Referencia (opcional)" value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="Ej. Para Ana" />
@@ -109,7 +109,7 @@ export default function AdminPage() {
       </section>
 
       {/* Tokens de reseteo */}
-      <section>
+      <section className="overflow-x-auto">
         <h2 className="text-lg font-semibold text-gray-700 mb-4">Tokens de reseteo de contraseña</h2>
         {resetToken && (
           <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 mb-4">
@@ -151,7 +151,7 @@ export default function AdminPage() {
       </section>
 
       {/* Usuarios */}
-      <section>
+      <section className="overflow-x-auto">
         <h2 className="text-lg font-semibold text-gray-700 mb-4">Usuarios</h2>
         <table className="w-full text-sm border-collapse">
           <thead>

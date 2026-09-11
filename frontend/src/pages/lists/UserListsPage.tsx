@@ -21,7 +21,7 @@ export default function UserListsPage() {
       )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {listas?.map((lista) => (
-          <div key={lista.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
+          <article key={lista.id} className="bg-white rounded-xl shadow-sm border border-gray-100 p-5 flex flex-col gap-3">
             <div className="flex items-start justify-between gap-2">
               <Link to={`/listas/${lista.id}`} className="font-semibold text-gray-800 hover:text-indigo-600 truncate">
                 {lista.name}
@@ -32,7 +32,7 @@ export default function UserListsPage() {
             <Link to={`/listas/${lista.id}`} className="text-sm text-indigo-600 hover:underline mt-auto">
               Ver lista →
             </Link>
-          </div>
+          </article>
         ))}
       </div>
     </div>

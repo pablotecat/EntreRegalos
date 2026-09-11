@@ -8,9 +8,9 @@ export function Navbar() {
   const logout = useLogout();
 
   return (
-    <nav className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+    <nav className="bg-white border-b border-gray-200 px-6 py-3 flex flex-wrap gap-3 items-center justify-between">
       <Link to="/" className="text-xl font-bold text-indigo-600">EntreRegalos</Link>
-      <div className="flex items-center gap-6">
+      <div className="flex flex-wrap items-center gap-3 sm:gap-6">
         <NavLink
           to="/listas"
           className={({ isActive }) =>
