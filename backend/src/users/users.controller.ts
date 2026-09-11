@@ -7,11 +7,10 @@ import {
   Patch,
   Post,
 } from '@nestjs/common';
-import { Role } from '@prisma/client';
+import { Role, User } from '@prisma/client';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UsersService } from './users.service';
-import { User } from '@prisma/client';
 
 @Controller('users')
 export class UsersController {
@@ -19,7 +18,10 @@ export class UsersController {
 
   @Get()
   async findAll(@CurrentUser() user: User) {
-    const users = await this.usersService.findAllActiveExcept(user.id);
+    const users =
+      user.role === Role.ADMIN
+        ? await this.usersService.findAll()
+        : await this.usersService.findAllActiveExcept(user.id);
     return users.map(({ passwordHash: _, ...u }) => u);
   }
 
