@@ -12,6 +12,9 @@ build/
 
 # Cobertura de tests
 coverage/
+test-results/
+playwright-report/
+blob-report/
 
 # Sistemas operativos
 .DS_Store
